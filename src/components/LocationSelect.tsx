@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -70,20 +70,17 @@ const LocationSelect = ({
     );
   }
 
-  if (error) {
+  if (error || locations.length === 0) {
     return (
-      <div className="flex items-center gap-2 text-destructive py-3">
-        <AlertCircle className="w-4 h-4" />
-        <span className="text-sm">{error}</span>
-      </div>
+      <Select disabled>
+        <SelectTrigger className="w-full opacity-60">
+          <SelectValue placeholder={loading ? "Loading locations…" : "No locations available"} />
+        </SelectTrigger>
+        <SelectContent />
+      </Select>
     );
   }
 
-  if (locations.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground py-3">No locations available.</p>
-    );
-  }
 
   return (
     <Select onValueChange={handleChange}>
