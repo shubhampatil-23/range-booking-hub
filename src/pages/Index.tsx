@@ -121,7 +121,7 @@ const Index = () => {
         reasonOfBooking: formData.purpose,
         noOfPersons: formData.attendees,
         totalBillableAmount: 0,
-        urlToken: companyToken,
+        urlToken: getConfig("companyEnrollmentCode") || companyToken,
       });
 
       setBookingResult({
