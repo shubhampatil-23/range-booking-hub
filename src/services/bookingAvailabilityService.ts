@@ -1,15 +1,11 @@
-import axiosInstance from "./axiosInstance";
+import { http } from "./httpClient";
 import type { AvailabilityRequest, AvailabilityResponse } from "@/types/api";
 
 export const bookingAvailabilityService = {
-  /** Fetch available slots between two dates for a location */
-  getByDates(
-    companyUrl: string,
+  async getByDates(
+    companyBeUrl: string,
     data: AvailabilityRequest
   ): Promise<AvailabilityResponse> {
-    const base = companyUrl.replace(/\/?$/, "/");
-    return axiosInstance
-      .post<AvailabilityResponse>(`${base}booking/getbydates`, data)
-      .then((r) => r.data);
+    return http.post<AvailabilityResponse>(companyBeUrl, "booking/getbydates", data);
   },
 };

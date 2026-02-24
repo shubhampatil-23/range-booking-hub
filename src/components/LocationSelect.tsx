@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MapPin, Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -9,12 +9,13 @@ import {
 } from "@/components/ui/select";
 import { bookingLocationService } from "@/services/bookingLocationService";
 import type { Location } from "@/types/api";
+import { getSlotDuration } from "@/types/api";
 
 interface LocationSelectProps {
   companyBeUrl: string;
   companyToken: string;
-  onSelect: (locationId: string) => void;
-  onLocationDetails?: (location: Location) => void;
+  onSelect: (locationId: string, locationName: string) => void;
+  onLocationDetails?: (location: Location, slotDurationMinutes: number) => void;
 }
 
 const LocationSelect = ({
@@ -34,35 +35,30 @@ const LocationSelect = ({
 
     bookingLocationService
       .getAllLocationsForBooking(companyBeUrl, companyToken)
-      .then((res) => {
-        if (!cancelled) {
-          setLocations(res.data ?? []);
-        }
+      .then((locs) => {
+        if (!cancelled) setLocations(locs);
       })
       .catch((err) => {
-        if (!cancelled) {
-          setError(err?.message ?? "Failed to load locations");
-        }
+        if (!cancelled) setError(err?.message ?? "Failed to load locations");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [companyBeUrl, companyToken]);
 
   const handleChange = (locationId: string) => {
-    onSelect(locationId);
+    const loc = locations.find((l) => l.id === locationId);
+    onSelect(locationId, loc?.locationName ?? "");
 
-    // Fetch full location details (slot duration, hours, etc.)
+    // Fetch full details for slot duration / hours
     bookingLocationService
       .getById(companyBeUrl, locationId)
-      .then((loc) => onLocationDetails?.(loc))
-      .catch(() => {
-        /* silently ignore detail fetch errors */
-      });
+      .then((detail) => {
+        onLocationDetails?.(detail, getSlotDuration(detail));
+      })
+      .catch(() => { /* ignore detail fetch errors */ });
   };
 
   if (loading) {
@@ -85,9 +81,7 @@ const LocationSelect = ({
 
   if (locations.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground py-3">
-        No locations available.
-      </p>
+      <p className="text-sm text-muted-foreground py-3">No locations available.</p>
     );
   }
 
