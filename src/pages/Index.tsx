@@ -2,7 +2,6 @@ import { useState } from "react";
 import { format } from "date-fns";
 import {
   CalendarIcon,
-  Crosshair,
   CheckCircle2,
   MapPin,
   Target,
@@ -22,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import LocationSelect from "@/components/LocationSelect";
 import SlotPicker, { type TimeSlot } from "@/components/SlotPicker";
+import SlotSection from "@/components/SlotSection";
 import BookingForm, { type BookingFormData } from "@/components/BookingForm";
 import { useToast } from "@/hooks/use-toast";
 import { useAppConfig } from "@/contexts/AppConfigContext";
@@ -303,23 +303,15 @@ const Index = () => {
           </Popover>
         </div>
 
-        {/* Pick Your Slot — full width */}
-        <div className="bg-card rounded-xl border border-border p-5 sm:p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Crosshair className="w-5 h-5 text-primary" />
-            <h2 className="font-display text-base font-semibold uppercase tracking-wider text-foreground">
-              Pick Your Slot
-            </h2>
-          </div>
-          <SlotPicker
-            date={date}
-            locationId={locationId}
-            companyBeUrl={companyBeUrl}
-            slotDurationMinutes={slotDurationMinutes}
-            selectedSlot={selectedSlot}
-            onSelectSlot={handleSlotSelect}
-          />
-        </div>
+        {/* Pick Your Slot — collapsible */}
+        <SlotSection
+          date={date}
+          locationId={locationId}
+          companyBeUrl={companyBeUrl}
+          slotDurationMinutes={slotDurationMinutes}
+          selectedSlot={selectedSlot}
+          onSelectSlot={handleSlotSelect}
+        />
 
         {/* Booking Details + Contact Details */}
         <BookingForm data={formData} onChange={setFormData} />
