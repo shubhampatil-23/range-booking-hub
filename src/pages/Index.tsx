@@ -1,21 +1,32 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Crosshair, CheckCircle2, MapPin, Target, Send } from "lucide-react";
+import { CalendarIcon, Crosshair, CheckCircle2, MapPin, Target, Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import SlotPicker from "@/components/SlotPicker";
-import BookingForm, { BookingFormData } from "@/components/BookingForm";
+import LocationSelect from "@/components/LocationSelect";
+import SlotPicker, { type TimeSlot } from "@/components/SlotPicker";
+import BookingForm, { type BookingFormData } from "@/components/BookingForm";
 import { useToast } from "@/hooks/use-toast";
+import { getAppConfig, type AppConfig } from "@/config/appConfig";
+import { bookingBeService } from "@/services/bookingBeService";
+import type { Location } from "@/types/api";
 
 const Index = () => {
+  const [config, setConfig] = useState<AppConfig | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+
   const [date, setDate] = useState<Date>(new Date());
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [location, setLocation] = useState<string>("");
+  const [selectedSlotData, setSelectedSlotData] = useState<TimeSlot | null>(null);
+  const [locationId, setLocationId] = useState<string | null>(null);
+  const [locationName, setLocationName] = useState<string>("");
+  const [slotDurationMinutes, setSlotDurationMinutes] = useState<number>(120);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [bookingResult, setBookingResult] = useState<{ bookingId?: string; bookingNumber?: number } | null>(null);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState<BookingFormData>({
@@ -27,19 +38,43 @@ const Index = () => {
     attendees: "1",
   });
 
+  // Load config on mount
+  useEffect(() => {
+    getAppConfig()
+      .then(setConfig)
+      .catch(() => setConfigError("Failed to load configuration."));
+  }, []);
+
   const handleDateChange = (d: Date | undefined) => {
     if (d) {
       setDate(d);
       setSelectedSlot(null);
+      setSelectedSlotData(null);
     }
   };
 
-  const handleSubmit = () => {
-    if (!location) {
+  const handleLocationSelect = (id: string, name: string) => {
+    setLocationId(id);
+    setLocationName(name);
+    setSelectedSlot(null);
+    setSelectedSlotData(null);
+  };
+
+  const handleLocationDetails = (loc: Location, duration: number) => {
+    setSlotDurationMinutes(duration);
+  };
+
+  const handleSlotSelect = (slotId: string, slot: TimeSlot) => {
+    setSelectedSlot(slotId);
+    setSelectedSlotData(slot);
+  };
+
+  const handleSubmit = async () => {
+    if (!locationId) {
       toast({ title: "Please select a location", variant: "destructive" });
       return;
     }
-    if (!selectedSlot) {
+    if (!selectedSlotData) {
       toast({ title: "Please select a time slot", variant: "destructive" });
       return;
     }
@@ -47,8 +82,63 @@ const Index = () => {
       toast({ title: "Please fill all required fields", variant: "destructive" });
       return;
     }
-    setSubmitted(true);
+    if (!config) return;
+
+    setSubmitting(true);
+    try {
+      const result = await bookingBeService.createBooking(config.companyBeUrl, {
+        locationId,
+        locationName,
+        contact: {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          phone: formData.phone,
+        },
+        bookingSchedule: [
+          {
+            startTime: selectedSlotData.startISO,
+            endTime: selectedSlotData.endISO,
+            totalMinutes: selectedSlotData.totalMinutes,
+          },
+        ],
+        reasonOfBooking: formData.purpose,
+        noOfPersons: formData.attendees,
+        totalBillableAmount: 0,
+        urlToken: config.companyToken,
+      });
+
+      setBookingResult({ bookingId: result.bookingId, bookingNumber: result.bookingNumber });
+      setSubmitted(true);
+    } catch (err: any) {
+      toast({
+        title: "Booking failed",
+        description: err?.response?.data?.message ?? err?.message ?? "Something went wrong",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
+
+  // Config loading / error
+  if (configError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Card className="max-w-md w-full p-8 text-center space-y-4">
+          <p className="text-destructive font-medium">{configError}</p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!config) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   if (submitted) {
     return (
@@ -59,7 +149,12 @@ const Index = () => {
           <p className="text-muted-foreground">
             Your slot on <span className="font-semibold text-foreground">{format(date, "EEEE, MMM d, yyyy")}</span> has been reserved.
           </p>
-          <Button onClick={() => { setSubmitted(false); setSelectedSlot(null); setLocation(""); }} className="mt-4">
+          {bookingResult?.bookingNumber && (
+            <p className="text-sm text-muted-foreground">
+              Booking #{bookingResult.bookingNumber}
+            </p>
+          )}
+          <Button onClick={() => { setSubmitted(false); setSelectedSlot(null); setSelectedSlotData(null); setLocationId(null); setLocationName(""); setBookingResult(null); }} className="mt-4">
             Book Another Slot
           </Button>
         </Card>
@@ -93,16 +188,12 @@ const Index = () => {
               Location
             </h2>
           </div>
-          <Select value={location} onValueChange={setLocation}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select shooting range location" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="main">Main Range – Kothrud</SelectItem>
-              <SelectItem value="annex">Annex Range – Baner</SelectItem>
-              <SelectItem value="outdoor">Outdoor Range – Hinjewadi</SelectItem>
-            </SelectContent>
-          </Select>
+          <LocationSelect
+            companyBeUrl={config.companyBeUrl}
+            companyToken={config.companyToken}
+            onSelect={handleLocationSelect}
+            onLocationDetails={handleLocationDetails}
+          />
         </div>
 
         {/* Pick Your Slot */}
@@ -143,7 +234,14 @@ const Index = () => {
           </div>
 
           {/* Slots */}
-          <SlotPicker date={date} selectedSlot={selectedSlot} onSelectSlot={setSelectedSlot} />
+          <SlotPicker
+            date={date}
+            locationId={locationId}
+            companyBeUrl={config.companyBeUrl}
+            slotDurationMinutes={slotDurationMinutes}
+            selectedSlot={selectedSlot}
+            onSelectSlot={handleSlotSelect}
+          />
         </div>
 
         {/* Booking Details + Contact Details */}
@@ -156,10 +254,14 @@ const Index = () => {
           <Button
             onClick={handleSubmit}
             size="lg"
+            disabled={submitting}
             className="w-full font-display uppercase tracking-wider text-base h-12 gap-2"
           >
-            <Send className="w-4 h-4" />
-            Confirm Booking
+            {submitting ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</>
+            ) : (
+              <><Send className="w-4 h-4" /> Confirm Booking</>
+            )}
           </Button>
         </div>
       </div>

@@ -1,35 +1,26 @@
-import axiosInstance from "./axiosInstance";
-import type { BookingModel, BookingResponse } from "@/types/api";
+import { http } from "./httpClient";
+import type { CreateBookingRequest, CreateBookingResponse, BookingModel } from "@/types/api";
 
 export const bookingBeService = {
-  /** Create a new booking */
-  createBooking(
+  async createBooking(
     companyBeUrl: string,
-    data: Partial<BookingModel>
-  ): Promise<BookingResponse> {
-    return axiosInstance
-      .post<BookingResponse>(`${companyBeUrl}booking/create`, data)
-      .then((r) => r.data);
+    data: CreateBookingRequest
+  ): Promise<CreateBookingResponse> {
+    return http.post<CreateBookingResponse>(companyBeUrl, "booking/create", data);
   },
 
-  /** Update an existing booking */
-  updateBooking(
+  async updateBooking(
     companyBeUrl: string,
     id: string,
     data: Partial<BookingModel>
-  ): Promise<BookingResponse> {
-    return axiosInstance
-      .post<BookingResponse>(`${companyBeUrl}booking/update/${id}`, data)
-      .then((r) => r.data);
+  ): Promise<CreateBookingResponse> {
+    return http.post<CreateBookingResponse>(companyBeUrl, `booking/update/${id}`, data);
   },
 
-  /** Fetch a booking by ID */
-  getBookingById(
+  async getBookingById(
     companyBeUrl: string,
     id: string
-  ): Promise<BookingResponse> {
-    return axiosInstance
-      .get<BookingResponse>(`${companyBeUrl}booking/${id}`)
-      .then((r) => r.data);
+  ): Promise<BookingModel> {
+    return http.get<BookingModel>(companyBeUrl, `booking/${id}`);
   },
 };

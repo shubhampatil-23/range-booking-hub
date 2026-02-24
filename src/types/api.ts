@@ -11,8 +11,16 @@ export interface Location {
   id: string;
   locationName: string;
   capacity: number;
-  slotDurationMinutes: number;
+  /** Backend may send any of these three field names */
+  slotDuration?: number;
+  slotDurationMinutes?: number;
+  slotDurationInMinutes?: number;
   locationHours: LocationHours[];
+}
+
+/** Helper to normalise whichever field the backend sends */
+export function getSlotDuration(loc: Location): number {
+  return loc.slotDurationMinutes ?? loc.slotDurationInMinutes ?? loc.slotDuration ?? 30;
 }
 
 // ── Booking ──────────────────────────────────────────────
@@ -24,11 +32,20 @@ export interface BookingSchedule {
   allDay?: boolean;
 }
 
+export interface ContactAddress {
+  city?: string;
+  line1?: string;
+  line2?: string;
+  state?: string;
+  zip?: string;
+}
+
 export interface Contact {
   firstName: string;
   lastName?: string;
   email?: string;
   phone: string;
+  address?: ContactAddress;
 }
 
 export interface RRuleDetails {
@@ -45,7 +62,7 @@ export interface BookingModel {
   bookingSchedule: BookingSchedule[];
   contact: Contact;
   reasonOfBooking: string;
-  noOfPersons: number;
+  noOfPersons: number | string;
   totalBillableAmount: number;
   urlToken: string;
   rRuleDetails?: RRuleDetails;
@@ -53,36 +70,55 @@ export interface BookingModel {
 
 // ── Request / Response shapes ────────────────────────────
 
+/** POST location/getbyurltoken/{token} */
+export interface LocationListResponse {
+  locations: Location[];
+}
+
+/** GET location/{id} — returns the Location object directly (or wrapped) */
+export type LocationDetailResponse = Location;
+
+/** POST booking/getbydates */
 export interface AvailabilityRequest {
-  fromDate: string;
-  toDate: string;
+  fromDate: string;   // "YYYY-MM-DDT00:00:00.000+0000"
+  toDate: string;     // "YYYY-MM-DDT23:59:59.999+0000"
   locationId: string;
 }
 
-export interface AvailabilitySlot {
-  startTime: string;
-  endTime: string;
-  available: boolean;
-}
-
-export interface LocationListResponse {
-  data: Location[];
-  message?: string;
-  success: boolean;
+export interface AvailablePeriod {
+  start: string;
+  end: string;
 }
 
 export interface AvailabilityResponse {
-  data: AvailabilitySlot[];
-  message?: string;
-  success: boolean;
+  slotDurationMinutes?: number;
+  startTimes?: string[];                // e.g. ["09:00","09:30"]
+  availablePeriods?: AvailablePeriod[];
+  bookings?: BookingSchedule[];
+  bookedPeriods?: AvailablePeriod[];
+  bookingSchedule?: BookingSchedule[];
+  totalAvailableMinutes?: number;
 }
 
-export interface BookingResponse {
-  data: BookingModel;
-  message?: string;
-  success: boolean;
+/** POST booking/create */
+export interface CreateBookingRequest {
+  locationId: string;
+  locationName: string;
+  contact: Contact;
+  bookingSchedule: BookingSchedule[];
+  reasonOfBooking: string;
+  noOfPersons: number | string;
+  totalBillableAmount: number;
+  urlToken?: string;
 }
 
+export interface CreateBookingResponse {
+  bookingId: string;
+  bookingNumber?: number;
+  booking?: BookingModel;
+}
+
+/** POST booking/payment/create */
 export interface PaymentRequest {
   bookingId: string;
   amount: number;
@@ -91,11 +127,7 @@ export interface PaymentRequest {
 }
 
 export interface PaymentResponse {
-  data: {
-    paymentId: string;
-    status: string;
-    [key: string]: unknown;
-  };
-  message?: string;
-  success: boolean;
+  paymentId: string;
+  status: string;
+  [key: string]: unknown;
 }

@@ -1,34 +1,28 @@
-import axiosInstance from "./axiosInstance";
-import type { Location, LocationListResponse } from "@/types/api";
+import { http } from "./httpClient";
+import type { Location, LocationListResponse, LocationDetailResponse } from "@/types/api";
+
+let locationCache: Location[] | null = null;
 
 export const bookingLocationService = {
-  /** Fetch all locations for the public booking page */
-  getAllLocationsForBooking(
-    companyUrl: string,
+  async getAllLocationsForBooking(
+    companyBeUrl: string,
     companyToken: string
-  ): Promise<LocationListResponse> {
-    return axiosInstance
-      .post<LocationListResponse>(
-        `${companyUrl}location/getbyurltoken/${companyToken}`,
-        {}
-      )
-      .then((r) => r.data);
+  ): Promise<Location[]> {
+    if (locationCache) return locationCache;
+    const res = await http.post<LocationListResponse>(
+      companyBeUrl,
+      `location/getbyurltoken/${companyToken}`,
+      {}
+    );
+    locationCache = res.locations ?? [];
+    return locationCache;
   },
 
-  /** Get a single location by ID */
-  getById(companyUrl: string, id: string): Promise<Location> {
-    return axiosInstance
-      .get<Location>(`${companyUrl}location/${id}`)
-      .then((r) => r.data);
+  async getById(companyBeUrl: string, id: string): Promise<Location> {
+    return http.get<LocationDetailResponse>(companyBeUrl, `location/${id}`);
   },
 
-  /** List locations with optional filters */
-  getAll(
-    companyUrl: string,
-    filters: Record<string, unknown> = {}
-  ): Promise<LocationListResponse> {
-    return axiosInstance
-      .post<LocationListResponse>(`${companyUrl}location`, filters)
-      .then((r) => r.data);
+  clearCache() {
+    locationCache = null;
   },
 };
