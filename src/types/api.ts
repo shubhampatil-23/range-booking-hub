@@ -2,25 +2,28 @@
 
 export interface LocationHours {
   day: string;
-  openTime: string;
-  closeTime: string;
-  isClosed: boolean;
+  /** Backend may send openTime or openingTime */
+  openTime?: string;
+  closeTime?: string;
+  openingTime?: string;
+  closingTime?: string;
+  isClosed?: boolean;
 }
 
 export interface Location {
   id: string;
   locationName: string;
-  capacity: number;
+  capacity?: number | null;
   /** Backend may send any of these three field names */
-  slotDuration?: number;
-  slotDurationMinutes?: number;
-  slotDurationInMinutes?: number;
-  locationHours: LocationHours[];
+  slotDuration?: number | null;
+  slotDurationMinutes?: number | null;
+  slotDurationInMinutes?: number | null;
+  locationHours?: LocationHours[];
 }
 
 /** Helper to normalise whichever field the backend sends */
 export function getSlotDuration(loc: Location): number {
-  return loc.slotDurationMinutes ?? loc.slotDurationInMinutes ?? loc.slotDuration ?? 30;
+  return loc.slotDurationMinutes ?? loc.slotDurationInMinutes ?? loc.slotDuration ?? 60;
 }
 
 // ── Booking ──────────────────────────────────────────────

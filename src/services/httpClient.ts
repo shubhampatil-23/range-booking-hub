@@ -10,6 +10,7 @@ export function urlJoin(base: string, path: string): string {
 const httpClient = axios.create({
   headers: { "Content-Type": "application/json" },
   timeout: 30_000,
+  withCredentials: true,
 });
 
 /** Convenience wrappers that accept a runtime baseUrl */

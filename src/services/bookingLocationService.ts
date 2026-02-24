@@ -9,17 +9,22 @@ export const bookingLocationService = {
     companyToken: string
   ): Promise<Location[]> {
     if (locationCache) return locationCache;
-    const res = await http.post<LocationListResponse>(
-      companyBeUrl,
-      `location/getbyurltoken/${companyToken}`,
-      {}
-    );
-    locationCache = res.locations ?? [];
+    const res = await http.post<
+      LocationListResponse | { data?: { locations?: Location[] } }
+    >(companyBeUrl, `location/getbyurltoken/${companyToken}`, {});
+    const list = res.locations ?? (res as { data?: { locations?: Location[] } }).data?.locations ?? [];
+    locationCache = list;
     return locationCache;
   },
 
   async getById(companyBeUrl: string, id: string): Promise<Location> {
-    return http.get<LocationDetailResponse>(companyBeUrl, `location/${id}`);
+    const res = await http.get<LocationDetailResponse | { data: Location }>(
+      companyBeUrl,
+      `location/${id}`
+    );
+    // Unwrap common API response wrapper: { data: Location }
+    const loc = (res as { data?: Location }).data ?? res;
+    return loc as Location;
   },
 
   clearCache() {

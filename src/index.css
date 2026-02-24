@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Oswald:wght@500;600;700&display=swap');
 
 @layer base {
   :root {
@@ -36,9 +36,9 @@
 
     --radius: 0.5rem;
 
-    --slot-available: 150 40% 94%;
-    --slot-available-border: 150 30% 70%;
-    --slot-available-text: 150 30% 25%;
+    --slot-available: 150 45% 92%;
+    --slot-available-border: 150 40% 65%;
+    --slot-available-text: 150 35% 22%;
     --slot-booked: 0 30% 95%;
     --slot-booked-border: 0 25% 80%;
     --slot-booked-text: 0 20% 50%;

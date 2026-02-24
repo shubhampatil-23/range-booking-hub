@@ -12,6 +12,8 @@ export interface AppConfig {
   address?: string;
   email?: string;
   phone?: string;
+  uuid?: string;
+  urlToken?: string;
   [key: string]: unknown; // allow extra keys without breaking
 }
 
@@ -30,6 +32,17 @@ function validateConfig(data: unknown): AppConfig {
     throw new Error(`Config missing required keys: ${missing.join(", ")}`);
   }
   return cfg as unknown as AppConfig;
+}
+
+/** Set uuid cookie for backend API (checks config, then URL ?uuid= param) */
+function setUuidCookie(config: AppConfig) {
+  const fromUrl = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("uuid")
+    : null;
+  const uuid = fromUrl ?? config.uuid ?? config.companyToken;
+  if (uuid) {
+    document.cookie = `uuid=${encodeURIComponent(uuid)}; path=/; max-age=86400`;
+  }
 }
 
 // ── Context value ───────────────────────────────────────────
@@ -62,7 +75,10 @@ export const AppConfigProvider: React.FC<{
     if (injected) {
       try {
         const validated = validateConfig(injected);
-        if (mounted) setConfig(validated);
+        if (mounted) {
+          setConfig(validated);
+          setUuidCookie(validated);
+        }
       } catch (err) {
         if (mounted) setError(err as Error);
       }
@@ -78,7 +94,10 @@ export const AppConfigProvider: React.FC<{
       })
       .then((data) => {
         const validated = validateConfig(data);
-        if (mounted) setConfig(validated);
+        if (mounted) {
+          setConfig(validated);
+          setUuidCookie(validated);
+        }
       })
       .catch((err) => {
         if (mounted) setError(err as Error);

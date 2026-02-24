@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Crosshair, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SlotPicker, { type TimeSlot } from "@/components/SlotPicker";
+import type { Location } from "@/types/api";
 
 interface SlotSectionProps {
   date: Date;
   locationId: string | null;
+  location: Location | null;
   companyBeUrl: string;
   slotDurationMinutes: number;
   selectedSlot: string | null;
@@ -15,6 +17,7 @@ interface SlotSectionProps {
 const SlotSection = ({
   date,
   locationId,
+  location,
   companyBeUrl,
   slotDurationMinutes,
   selectedSlot,
@@ -52,6 +55,7 @@ const SlotSection = ({
         <SlotPicker
           date={date}
           locationId={locationId}
+          location={location}
           companyBeUrl={companyBeUrl}
           slotDurationMinutes={slotDurationMinutes}
           selectedSlot={selectedSlot}

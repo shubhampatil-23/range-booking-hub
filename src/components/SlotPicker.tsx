@@ -1,8 +1,17 @@
 import { useEffect, useState, useRef } from "react";
 import { format } from "date-fns";
+import { enUS } from "date-fns/locale";
 import { Clock, X, Loader2 } from "lucide-react";
 import { bookingAvailabilityService } from "@/services/bookingAvailabilityService";
-import type { AvailabilityResponse, AvailablePeriod, BookingSchedule as BookingScheduleType } from "@/types/api";
+import { bookingLocationService } from "@/services/bookingLocationService";
+import type {
+  AvailabilityResponse,
+  AvailablePeriod,
+  BookingSchedule as BookingScheduleType,
+  Location,
+  LocationHours,
+} from "@/types/api";
+import { getSlotDuration } from "@/types/api";
 
 export interface TimeSlot {
   id: string;
@@ -30,22 +39,191 @@ function formatTime12(hour: number, min: number): string {
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")} ${suffix}`;
 }
 
+/** Parse "HH:mm" or "H:mm" to minutes since midnight */
+function parseTimeToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+
+/** Normalize day name for matching (supports "Monday", "Mon", "MON", etc.) */
+function normalizeDayName(day: string): string {
+  return day?.trim().toLowerCase().slice(0, 3) ?? "";
+}
+
+/** Recursively find array that looks like locationHours (objects with day + openingTime) */
+function findLocationHoursInObject(obj: unknown): LocationHours[] | null {
+  if (!obj || typeof obj !== "object") return null;
+  const record = obj as Record<string, unknown>;
+  const candidates = [
+    record.locationHours,
+    record.location_hours,
+    record.hours,
+    record.operatingHours,
+  ];
+  for (const c of candidates) {
+    if (Array.isArray(c) && c.length > 0) {
+      const first = c[0] as Record<string, unknown>;
+      if (first && (first.day || first.openingTime || first.opening_time)) {
+        return c as LocationHours[];
+      }
+    }
+  }
+  for (const v of Object.values(record)) {
+    const found = findLocationHoursInObject(v);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Normalize LocationHours[] from API — handles various field names and nesting */
+function getLocationHoursArray(loc: Location | null): LocationHours[] {
+  if (!loc) return [];
+  const found = findLocationHoursInObject(loc);
+  return found ?? [];
+}
+
+/** Extract open/close time from a LocationHours entry — handles camelCase and snake_case */
+function getOpenCloseFromEntry(
+  h: LocationHours | Record<string, unknown>
+): { openTime: string; closeTime: string } | null {
+  const r = h as Record<string, unknown>;
+  const openTime =
+    (r.openingTime as string) ??
+    (r.opening_time as string) ??
+    (r.openTime as string) ??
+    (r.open_time as string);
+  const closeTime =
+    (r.closingTime as string) ??
+    (r.closing_time as string) ??
+    (r.closeTime as string) ??
+    (r.close_time as string);
+  return openTime && closeTime ? { openTime, closeTime } : null;
+}
+
+/** Get open/close minutes for a date from location hours.
+ * Uses locationHours array (per-day); falls back to root-level openingTime/closingTime from /v1/location/{id} response. */
+function getOpenCloseForDate(
+  date: Date,
+  locationHours: (LocationHours | Record<string, unknown>)[],
+  loc?: Location | null
+): { openMin: number; closeMin: number } | null {
+  const dayName = format(date, "EEEE", { locale: enUS });
+  const targetNorm = normalizeDayName(dayName);
+  const hoursForDay = locationHours.find((h) => {
+    const r = h as Record<string, unknown>;
+    const day = (r.day as string) ?? "";
+    if (!day || (r.isClosed as boolean) === true) return false;
+    return normalizeDayName(day) === targetNorm;
+  });
+  if (hoursForDay) {
+    const times = getOpenCloseFromEntry(hoursForDay);
+    if (times)
+      return {
+        openMin: parseTimeToMinutes(times.openTime),
+        closeMin: parseTimeToMinutes(times.closeTime),
+      };
+  }
+  // Fallback: root-level openingTime/closingTime (API returns these on location object)
+  if (loc) {
+    const r = loc as Record<string, unknown>;
+    const root = (r.data ?? r.result ?? r.content ?? r) as Record<string, unknown>;
+    const times = getOpenCloseFromEntry(root as LocationHours);
+    if (times)
+      return {
+        openMin: parseTimeToMinutes(times.openTime),
+        closeMin: parseTimeToMinutes(times.closeTime),
+      };
+  }
+  return null;
+}
+
+/** Build slots from API startTimes (e.g. ["09:00","09:30"]) */
+function slotsFromStartTimes(
+  date: Date,
+  startTimes: string[],
+  duration: number
+): TimeSlot[] {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+
+  return startTimes.map((st, idx) => {
+    const [h, m] = st.split(":").map(Number);
+    const startH = h ?? 0;
+    const startM = m ?? 0;
+    const startTotal = startH * 60 + startM;
+    const endTotal = startTotal + duration;
+    const endH = Math.floor(endTotal / 60);
+    const endM = endTotal % 60;
+
+    const startISO = `${yyyy}-${mm}-${dd}T${String(startH).padStart(2, "0")}:${String(startM).padStart(2, "0")}:00.000+0000`;
+    const endISO = `${yyyy}-${mm}-${dd}T${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}:00.000+0000`;
+
+    return {
+      id: `slot-${idx}`,
+      startTime: formatTime12(startH, startM),
+      endTime: formatTime12(endH, endM),
+      startISO,
+      endISO,
+      totalMinutes: duration,
+      booked: false,
+    };
+  });
+}
+
+/** Build slots from API availablePeriods */
+function slotsFromAvailablePeriods(
+  periods: AvailablePeriod[],
+  slotDurationMinutes: number
+): TimeSlot[] {
+  const slots: TimeSlot[] = [];
+  let idx = 0;
+  for (const p of periods) {
+    const start = new Date(p.start);
+    const end = new Date(p.end);
+    let current = start.getTime();
+    const endMs = end.getTime();
+    const durationMs = slotDurationMinutes * 60 * 1000;
+
+    while (current + durationMs <= endMs) {
+      const s = new Date(current);
+      const e = new Date(current + durationMs);
+      const startH = s.getHours();
+      const startM = s.getMinutes();
+      const endH = e.getHours();
+      const endM = e.getMinutes();
+
+      slots.push({
+        id: `slot-${idx++}`,
+        startTime: formatTime12(startH, startM),
+        endTime: formatTime12(endH, endM),
+        startISO: s.toISOString().replace("Z", "+0000"),
+        endISO: e.toISOString().replace("Z", "+0000"),
+        totalMinutes: slotDurationMinutes,
+        booked: false,
+      });
+      current += durationMs;
+    }
+  }
+  return slots;
+}
+
+/** Generate slots from open/close times (from location hours) */
 function generateSlotsFromDuration(
   date: Date,
   slotDurationMinutes: number,
-  openHour = 8,
-  closeHour = 18
+  openMin: number,
+  closeMin: number
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const dd = String(date.getDate()).padStart(2, "0");
 
-  let currentMin = openHour * 60;
-  const endMin = closeHour * 60;
+  let currentMin = openMin;
   let idx = 0;
 
-  while (currentMin + slotDurationMinutes <= endMin) {
+  while (currentMin + slotDurationMinutes <= closeMin) {
     const startH = Math.floor(currentMin / 60);
     const startM = currentMin % 60;
     const endTotal = currentMin + slotDurationMinutes;
@@ -98,15 +276,21 @@ function isSlotBooked(
 interface SlotPickerProps {
   date: Date;
   locationId: string | null;
+  location: Location | null;
   companyBeUrl: string;
   slotDurationMinutes: number;
   selectedSlot: string | null;
   onSelectSlot: (slotId: string, slot: TimeSlot) => void;
 }
 
+/** Default business hours (9 AM - 5 PM) when API/location has no data */
+const DEFAULT_OPEN_MIN = 9 * 60;
+const DEFAULT_CLOSE_MIN = 17 * 60;
+
 const SlotPicker = ({
   date,
   locationId,
+  location,
   companyBeUrl,
   slotDurationMinutes,
   selectedSlot,
@@ -120,44 +304,115 @@ const SlotPicker = ({
   useEffect(() => {
     if (!locationId) {
       setSlots([]);
+      setError(null);
       return;
     }
 
-    // Debounce 300ms
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setLoading(true);
       setError(null);
 
-      bookingAvailabilityService
-        .getByDates(companyBeUrl, {
+      const tryBuildSlots = (
+        res: AvailabilityResponse,
+        loc: Location | null
+      ): TimeSlot[] => {
+        const duration =
+          res.slotDurationMinutes ??
+          (loc ? getSlotDuration(loc) : null) ??
+          slotDurationMinutes;
+        const bookedPeriods = res.bookedPeriods ?? [];
+        const bookings = res.bookings ?? res.bookingSchedule ?? [];
+
+        let rawSlots: TimeSlot[];
+
+        // Prefer /v1/location/{id} data — locationHours (per-day) or root-level openingTime/closingTime
+        const hours = getLocationHoursArray(loc);
+        const openClose = loc ? getOpenCloseForDate(date, hours, loc) : null;
+
+        if (openClose) {
+          rawSlots = generateSlotsFromDuration(
+            date,
+            duration,
+            openClose.openMin,
+            openClose.closeMin
+          );
+        } else if (hours.length > 0) {
+          rawSlots = [];
+        } else if (res.startTimes && res.startTimes.length > 0) {
+          rawSlots = slotsFromStartTimes(date, res.startTimes, duration);
+        } else if (res.availablePeriods && res.availablePeriods.length > 0) {
+          rawSlots = slotsFromAvailablePeriods(res.availablePeriods, duration);
+        } else {
+          if (import.meta.env.DEV && loc) {
+            console.warn("[SlotPicker] Using 9–5 fallback: no locationHours for", format(date, "EEEE"), "loc keys:", Object.keys(loc as object).join(", "));
+          }
+          rawSlots = generateSlotsFromDuration(
+            date,
+            duration,
+            DEFAULT_OPEN_MIN,
+            DEFAULT_CLOSE_MIN
+          );
+        }
+
+        return rawSlots.map((slot) => ({
+          ...slot,
+          booked: isSlotBooked(slot, bookedPeriods, bookings),
+        }));
+      };
+
+      const getLocationWithHours = (): Promise<Location | null> => {
+        if (!locationId || !companyBeUrl) return Promise.resolve(location);
+        return bookingLocationService
+          .getById(companyBeUrl, locationId)
+          .then((loc) => loc)
+          .catch(() => location);
+      };
+
+      Promise.all([
+        bookingAvailabilityService.getByDates(companyBeUrl, {
           fromDate: toBackendDate(date),
           toDate: toBackendDate(date, true),
           locationId,
+        }),
+        getLocationWithHours(),
+      ])
+        .then(([res, loc]) => {
+          const locToUse = loc ?? location;
+          const built = tryBuildSlots(res, locToUse);
+          setSlots(built);
         })
-        .then((res: AvailabilityResponse) => {
-          const duration = res.slotDurationMinutes ?? slotDurationMinutes;
-          const generated = generateSlotsFromDuration(date, duration);
-
-          const bookedPeriods = res.bookedPeriods ?? [];
-          const bookings = res.bookings ?? res.bookingSchedule ?? [];
-
-          const withAvailability = generated.map((slot) => ({
-            ...slot,
-            booked: isSlotBooked(slot, bookedPeriods, bookings),
-          }));
-
-          setSlots(withAvailability);
-        })
-        .catch(() => {
-          // Fallback: show generated slots without booking info
-          setSlots(generateSlotsFromDuration(date, slotDurationMinutes));
-        })
+        .catch(() =>
+          getLocationWithHours().then((loc) => {
+            const hours = getLocationHoursArray(loc);
+            const openClose = loc ? getOpenCloseForDate(date, hours, loc) : null;
+            if (openClose) {
+              const rawSlots = generateSlotsFromDuration(
+                date,
+                slotDurationMinutes,
+                openClose.openMin,
+                openClose.closeMin
+              );
+              setSlots(rawSlots.map((s) => ({ ...s, booked: false })));
+            } else if (hours.length > 0) {
+              setSlots([]);
+            } else {
+              const defaultSlots = generateSlotsFromDuration(
+                date,
+                slotDurationMinutes,
+                DEFAULT_OPEN_MIN,
+                DEFAULT_CLOSE_MIN
+              );
+              setSlots(defaultSlots.map((s) => ({ ...s, booked: false })));
+            }
+            setError(null);
+          })
+        )
         .finally(() => setLoading(false));
     }, 300);
 
     return () => clearTimeout(debounceRef.current);
-  }, [date, locationId, companyBeUrl, slotDurationMinutes]);
+  }, [date, locationId, location, companyBeUrl, slotDurationMinutes]);
 
   if (!locationId) {
     return (
@@ -180,6 +435,14 @@ const SlotPicker = ({
     return (
       <p className="text-sm text-muted-foreground py-4 text-center">
         Slots unavailable. Please try again later.
+      </p>
+    );
+  }
+
+  if (slots.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground py-4 text-center">
+        No available slot for booking on the selected date.
       </p>
     );
   }
@@ -210,7 +473,7 @@ const SlotPicker = ({
                     ? "bg-slot-booked border-slot-booked-border cursor-not-allowed opacity-60"
                     : isSelected
                     ? "bg-primary border-primary text-primary-foreground shadow-lg ring-2 ring-primary/30 scale-[1.02]"
-                    : "bg-muted/40 border-border hover:border-primary/60 hover:shadow-sm cursor-pointer"
+                    : "bg-slot-available border-slot-available-border text-slot-available-text hover:border-primary/60 hover:shadow-sm cursor-pointer"
                 }
               `}
               style={{ animationDelay: `${i * 30}ms`, animationFillMode: "both" }}
@@ -221,16 +484,16 @@ const SlotPicker = ({
                     ? "text-destructive"
                     : isSelected
                     ? "text-primary-foreground/80"
-                    : "text-muted-foreground"
+                    : "text-slot-available-text"
                 }`}
               />
               <span className={`text-sm sm:text-base font-bold leading-tight ${
-                isBooked ? "text-destructive" : isSelected ? "text-primary-foreground" : "text-foreground"
+                isBooked ? "text-destructive" : isSelected ? "text-primary-foreground" : "text-slot-available-text"
               }`}>
                 {slot.startTime}
               </span>
               <span className={`text-[10px] sm:text-xs leading-tight ${
-                isBooked ? "text-slot-booked-text" : isSelected ? "text-primary-foreground/70" : "text-muted-foreground"
+                isBooked ? "text-slot-booked-text" : isSelected ? "text-primary-foreground/70" : "text-slot-available-text"
               }`}>
                 to {slot.endTime}
               </span>
@@ -239,7 +502,7 @@ const SlotPicker = ({
                   ? "text-destructive"
                   : isSelected
                   ? "text-primary-foreground"
-                  : "text-accent"
+                  : "text-slot-available-text"
               }`}>
                 {isBooked ? (
                   <><X className="w-3 h-3" /> Booked</>

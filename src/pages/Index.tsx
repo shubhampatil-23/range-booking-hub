@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { format } from "date-fns";
 import {
   CalendarIcon,
   CheckCircle2,
+  Download,
   MapPin,
   Target,
   Send,
@@ -27,6 +28,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAppConfig } from "@/contexts/AppConfigContext";
 import { bookingBeService } from "@/services/bookingBeService";
 import { buildPayload } from "@/utils/booking";
+import { toPng } from "html-to-image";
 import type { Location } from "@/types/api";
 
 const Index = () => {
@@ -45,7 +47,8 @@ const Index = () => {
   const [selectedSlotData, setSelectedSlotData] = useState<TimeSlot | null>(null);
   const [locationId, setLocationId] = useState<string | null>(null);
   const [locationName, setLocationName] = useState<string>("");
-  const [slotDurationMinutes, setSlotDurationMinutes] = useState<number>(120);
+  const [location, setLocation] = useState<Location | null>(null);
+  const [slotDurationMinutes, setSlotDurationMinutes] = useState<number>(60);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [bookingResult, setBookingResult] = useState<{
@@ -61,12 +64,40 @@ const Index = () => {
     phone: "",
     purpose: "",
     attendees: "1",
-    addressLine1: "",
-    addressLine2: "",
     city: "",
-    state: "",
-    zip: "",
   });
+  const [invalidField, setInvalidField] = useState<string | null>(null);
+  const confirmationCardRef = useRef<HTMLDivElement>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadImage = async () => {
+    if (!confirmationCardRef.current) return;
+    setDownloading(true);
+    try {
+      const dataUrl = await toPng(confirmationCardRef.current, {
+        backgroundColor: "#ffffff",
+        pixelRatio: 2,
+      });
+      const link = document.createElement("a");
+      link.download = `booking-confirmation-${bookingResult?.bookingNumber ?? "slot"}.png`;
+      link.href = dataUrl;
+      link.click();
+      toast({ title: "Image downloaded", description: "Booking confirmation saved." });
+    } catch {
+      toast({ title: "Download failed", description: "Could not save image.", variant: "destructive" });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const focusInvalidField = (fieldId: string) => {
+    setInvalidField(fieldId);
+    requestAnimationFrame(() => {
+      const el = document.getElementById(fieldId);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      (el as HTMLInputElement | HTMLTextAreaElement)?.focus();
+    });
+  };
 
   const handleDateChange = (d: Date | undefined) => {
     if (d) {
@@ -79,11 +110,13 @@ const Index = () => {
   const handleLocationSelect = (id: string, name: string) => {
     setLocationId(id);
     setLocationName(name);
+    setLocation(null);
     setSelectedSlot(null);
     setSelectedSlotData(null);
   };
 
-  const handleLocationDetails = (_loc: Location, duration: number) => {
+  const handleLocationDetails = (loc: Location, duration: number) => {
+    setLocation(loc);
     setSlotDurationMinutes(duration);
   };
 
@@ -103,17 +136,21 @@ const Index = () => {
     }
     if (!formData.firstName || !formData.phone || !formData.purpose) {
       toast({ title: "Please fill all required fields", variant: "destructive" });
+      const field = !formData.firstName ? "firstName" : !formData.phone ? "phone" : "purpose";
+      focusInvalidField(field);
       return;
     }
 
     const phoneRegex = /^\+?[0-9\s\-]{7,15}$/;
     if (!phoneRegex.test(formData.phone.trim())) {
       toast({ title: "Invalid phone number", description: "Enter a valid phone (7–15 digits)", variant: "destructive" });
+      focusInvalidField("phone");
       return;
     }
 
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
       toast({ title: "Invalid email", description: "Please enter a valid email address", variant: "destructive" });
+      focusInvalidField("email");
       return;
     }
 
@@ -131,10 +168,7 @@ const Index = () => {
           email: formData.email,
           phone: formData.phone,
           address: {
-            line1: formData.addressLine1,
-            line2: formData.addressLine2,
             city: formData.city,
-            pin: formData.zip,
           },
         },
         reasonOfBooking: formData.purpose,
@@ -142,6 +176,7 @@ const Index = () => {
         totalBillableAmount: 0,
         start: startDate,
         end: endDate,
+        urlToken: getConfig("urlToken") as string | undefined,
         companyEnrollmentCode: getConfig("companyEnrollmentCode") as string | undefined,
         companyToken,
       });
@@ -187,60 +222,76 @@ const Index = () => {
   if (submitted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="max-w-md w-full p-8 text-center space-y-6 border-primary/20">
-          {/* Animated check */}
-          <div className="mx-auto w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center ring-4 ring-primary/20">
-            <CheckCircle2 className="w-12 h-12 text-primary" />
-          </div>
-
-          <div className="space-y-2">
-            <h2 className="font-display text-2xl font-bold text-foreground uppercase tracking-wide">
-              Booking Confirmed!
-            </h2>
-            <p className="text-muted-foreground">
-              Your slot on{" "}
-              <span className="font-semibold text-foreground">
-                {format(date, "EEEE, MMM d, yyyy")}
-              </span>{" "}
-              at <span className="font-semibold text-foreground">{locationName}</span> has been reserved.
-            </p>
-          </div>
-
-          {/* Booking details card */}
-          <div className="bg-muted/50 rounded-lg p-4 text-left space-y-2 text-sm">
-            {bookingResult?.bookingNumber && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Booking #</span>
-                <span className="font-bold text-foreground">{bookingResult.bookingNumber}</span>
-              </div>
-            )}
-            {bookingResult?.bookingId && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Reference</span>
-                <span className="font-mono text-xs text-foreground">{bookingResult.bookingId}</span>
-              </div>
-            )}
-            {selectedSlotData && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Time</span>
-                <span className="font-semibold text-foreground">
-                  {selectedSlotData.startTime} – {selectedSlotData.endTime}
-                </span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Name</span>
-              <span className="text-foreground">{formData.firstName} {formData.lastName}</span>
+        <div className="max-w-md w-full space-y-4">
+          <Card ref={confirmationCardRef} className="w-full p-8 text-center space-y-6 border-primary/20">
+            {/* Animated check */}
+            <div className="mx-auto w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center ring-4 ring-primary/20">
+              <CheckCircle2 className="w-12 h-12 text-primary" />
             </div>
-            {formData.phone && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Phone</span>
-                <span className="text-foreground">{formData.phone}</span>
-              </div>
-            )}
-          </div>
 
-          <div className="flex flex-col gap-3 pt-2">
+            <div className="space-y-2">
+              <h2 className="font-display text-2xl font-bold text-foreground uppercase tracking-wide">
+                Booking Confirmed!
+              </h2>
+              <p className="text-muted-foreground">
+                Your slot on{" "}
+                <span className="font-semibold text-foreground">
+                  {format(date, "EEEE, MMM d, yyyy")}
+                </span>{" "}
+                at <span className="font-semibold text-foreground">{locationName}</span> has been reserved.
+              </p>
+            </div>
+
+            {/* Booking details card */}
+            <div className="bg-muted/50 rounded-lg p-4 text-left space-y-2 text-sm">
+              {bookingResult?.bookingNumber && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Booking #</span>
+                  <span className="font-bold text-foreground">{bookingResult.bookingNumber}</span>
+                </div>
+              )}
+              {bookingResult?.bookingId && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Reference</span>
+                  <span className="font-mono text-xs text-foreground">{bookingResult.bookingId}</span>
+                </div>
+              )}
+              {selectedSlotData && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Time</span>
+                  <span className="font-semibold text-foreground">
+                    {selectedSlotData.startTime} – {selectedSlotData.endTime}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Name</span>
+                <span className="text-foreground">{formData.firstName} {formData.lastName}</span>
+              </div>
+              {formData.phone && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Phone</span>
+                  <span className="text-foreground">{formData.phone}</span>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          <div className="flex flex-col gap-3">
+            <Button
+              onClick={handleDownloadImage}
+              disabled={downloading}
+              variant="outline"
+              className="w-full font-display uppercase tracking-wider gap-2"
+              size="lg"
+            >
+              {downloading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}{" "}
+              Download as Image
+            </Button>
             <Button
               onClick={() => {
                 setSubmitted(false);
@@ -248,12 +299,14 @@ const Index = () => {
                 setSelectedSlotData(null);
                 setLocationId(null);
                 setLocationName("");
+                setLocation(null);
                 setBookingResult(null);
                 setFormData({
                   firstName: "", lastName: "", email: "", phone: "",
                   purpose: "", attendees: "1",
-                  addressLine1: "", addressLine2: "", city: "", state: "", zip: "",
+                  city: "",
                 });
+                setInvalidField(null);
               }}
               className="w-full font-display uppercase tracking-wider gap-2"
               size="lg"
@@ -261,7 +314,7 @@ const Index = () => {
               <CalendarIcon className="w-4 h-4" /> Book Another Slot
             </Button>
           </div>
-        </Card>
+        </div>
       </div>
     );
   }
@@ -336,7 +389,8 @@ const Index = () => {
           />
         </div>
 
-        {/* Date */}
+        {/* Date — shown only when location is selected */}
+        {locationId && (
         <div className="bg-card rounded-xl border border-border p-5 sm:p-6">
           <div className="flex items-center gap-2 mb-4">
             <CalendarIcon className="w-5 h-5 text-accent" />
@@ -370,11 +424,13 @@ const Index = () => {
             </PopoverContent>
           </Popover>
         </div>
+        )}
 
         {/* Pick Your Slot — collapsible */}
         <SlotSection
           date={date}
           locationId={locationId}
+          location={location}
           companyBeUrl={companyBeUrl}
           slotDurationMinutes={slotDurationMinutes}
           selectedSlot={selectedSlot}
@@ -382,7 +438,12 @@ const Index = () => {
         />
 
         {/* Booking Details + Contact Details */}
-        <BookingForm data={formData} onChange={setFormData} />
+        <BookingForm
+          data={formData}
+          onChange={setFormData}
+          invalidField={invalidField}
+          onFieldChange={(field) => field === invalidField && setInvalidField(null)}
+        />
       </main>
 
       {/* Sticky Confirm Button */}

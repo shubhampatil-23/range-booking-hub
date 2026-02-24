@@ -43,6 +43,7 @@ export function buildPayload(input: {
   totalBillableAmount?: number;
   start: Date;
   end: Date;
+  urlToken?: string;
   companyEnrollmentCode?: string;
   companyToken?: string;
 }): CreateBookingPayload {
@@ -55,11 +56,14 @@ export function buildPayload(input: {
     totalBillableAmount,
     start,
     end,
+    urlToken,
     companyEnrollmentCode,
     companyToken,
   } = input;
 
   const totalMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
+
+  const token = urlToken ?? companyToken ?? companyEnrollmentCode;
 
   return {
     locationId,
@@ -70,12 +74,13 @@ export function buildPayload(input: {
         startTime: formatDateForApi(start),
         endTime: formatDateForApi(end),
         totalMinutes,
+        allDay: false,
       },
     ],
     reasonOfBooking,
     noOfPersons:
       typeof noOfPersons === "number" ? String(noOfPersons) : noOfPersons,
     totalBillableAmount,
-    urlToken: companyEnrollmentCode ?? companyToken,
+    ...(token && { urlToken: token }),
   };
 }

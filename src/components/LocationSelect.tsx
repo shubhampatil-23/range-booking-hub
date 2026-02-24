@@ -11,12 +11,6 @@ import { bookingLocationService } from "@/services/bookingLocationService";
 import type { Location } from "@/types/api";
 import { getSlotDuration } from "@/types/api";
 
-const DUMMY_LOCATIONS: Location[] = [
-  { id: "loc_1", locationName: "Main Shooting Range", capacity: 20, slotDurationMinutes: 30, locationHours: [] },
-  { id: "loc_2", locationName: "Indoor Practice Hall", capacity: 10, slotDurationMinutes: 60, locationHours: [] },
-  { id: "loc_3", locationName: "Outdoor Training Ground", capacity: 30, slotDurationMinutes: 45, locationHours: [] },
-];
-
 interface LocationSelectProps {
   companyBeUrl: string;
   companyToken: string;
@@ -42,10 +36,10 @@ const LocationSelect = ({
     bookingLocationService
       .getAllLocationsForBooking(companyBeUrl, companyToken)
       .then((locs) => {
-        if (!cancelled) setLocations(locs.length > 0 ? locs : DUMMY_LOCATIONS);
+        if (!cancelled) setLocations(locs);
       })
       .catch(() => {
-        if (!cancelled) setLocations(DUMMY_LOCATIONS);
+        if (!cancelled) setLocations([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -58,16 +52,16 @@ const LocationSelect = ({
     const loc = locations.find((l) => l.id === locationId);
     onSelect(locationId, loc?.locationName ?? "");
 
-    // Fetch full details for slot duration / hours
+    // Pass location from getbyurltoken list immediately (has locationHours, slotDuration)
+    if (loc) onLocationDetails?.(loc, getSlotDuration(loc));
+
+    // Optionally fetch full details to refresh
     bookingLocationService
       .getById(companyBeUrl, locationId)
       .then((detail) => {
         onLocationDetails?.(detail, getSlotDuration(detail));
       })
-      .catch(() => {
-        // Fallback: use dummy location data for slot duration
-        if (loc) onLocationDetails?.(loc, getSlotDuration(loc));
-      });
+      .catch(() => {});
   };
 
   if (loading) {
