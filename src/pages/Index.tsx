@@ -1,22 +1,42 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
-import { CalendarIcon, Crosshair, CheckCircle2, MapPin, Target, Send, Loader2 } from "lucide-react";
+import {
+  CalendarIcon,
+  Crosshair,
+  CheckCircle2,
+  MapPin,
+  Target,
+  Send,
+  Loader2,
+  Mail,
+  Phone,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import LocationSelect from "@/components/LocationSelect";
 import SlotPicker, { type TimeSlot } from "@/components/SlotPicker";
 import BookingForm, { type BookingFormData } from "@/components/BookingForm";
 import { useToast } from "@/hooks/use-toast";
-import { getAppConfig, type AppConfig } from "@/config/appConfig";
+import { useAppConfig } from "@/contexts/AppConfigContext";
 import { bookingBeService } from "@/services/bookingBeService";
 import type { Location } from "@/types/api";
 
 const Index = () => {
-  const [config, setConfig] = useState<AppConfig | null>(null);
-  const [configError, setConfigError] = useState<string | null>(null);
+  const { loading: configLoading, error: configError, getConfig } = useAppConfig();
+
+  const companyBeUrl = getConfig("url") ?? "";
+  const companyToken = getConfig("companyToken") ?? "";
+  const companyName = getConfig("companyName") ?? "Booking";
+  const companyAddress = getConfig("address") ?? "";
+  const companyEmail = getConfig("email") ?? "";
+  const companyPhone = getConfig("phone") ?? "";
 
   const [date, setDate] = useState<Date>(new Date());
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
@@ -26,7 +46,10 @@ const Index = () => {
   const [slotDurationMinutes, setSlotDurationMinutes] = useState<number>(120);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [bookingResult, setBookingResult] = useState<{ bookingId?: string; bookingNumber?: number } | null>(null);
+  const [bookingResult, setBookingResult] = useState<{
+    bookingId?: string;
+    bookingNumber?: number;
+  } | null>(null);
   const { toast } = useToast();
 
   const [formData, setFormData] = useState<BookingFormData>({
@@ -37,13 +60,6 @@ const Index = () => {
     purpose: "",
     attendees: "1",
   });
-
-  // Load config on mount
-  useEffect(() => {
-    getAppConfig()
-      .then(setConfig)
-      .catch(() => setConfigError("Failed to load configuration."));
-  }, []);
 
   const handleDateChange = (d: Date | undefined) => {
     if (d) {
@@ -60,7 +76,7 @@ const Index = () => {
     setSelectedSlotData(null);
   };
 
-  const handleLocationDetails = (loc: Location, duration: number) => {
+  const handleLocationDetails = (_loc: Location, duration: number) => {
     setSlotDurationMinutes(duration);
   };
 
@@ -82,11 +98,10 @@ const Index = () => {
       toast({ title: "Please fill all required fields", variant: "destructive" });
       return;
     }
-    if (!config) return;
 
     setSubmitting(true);
     try {
-      const result = await bookingBeService.createBooking(config.companyBeUrl, {
+      const result = await bookingBeService.createBooking(companyBeUrl, {
         locationId,
         locationName,
         contact: {
@@ -105,15 +120,19 @@ const Index = () => {
         reasonOfBooking: formData.purpose,
         noOfPersons: formData.attendees,
         totalBillableAmount: 0,
-        urlToken: config.companyToken,
+        urlToken: companyToken,
       });
 
-      setBookingResult({ bookingId: result.bookingId, bookingNumber: result.bookingNumber });
+      setBookingResult({
+        bookingId: result.bookingId,
+        bookingNumber: result.bookingNumber,
+      });
       setSubmitted(true);
     } catch (err: any) {
       toast({
         title: "Booking failed",
-        description: err?.response?.data?.message ?? err?.message ?? "Something went wrong",
+        description:
+          err?.response?.data?.message ?? err?.message ?? "Something went wrong",
         variant: "destructive",
       });
     } finally {
@@ -126,13 +145,13 @@ const Index = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full p-8 text-center space-y-4">
-          <p className="text-destructive font-medium">{configError}</p>
+          <p className="text-destructive font-medium">Failed to load configuration.</p>
         </Card>
       </div>
     );
   }
 
-  if (!config) {
+  if (configLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -145,16 +164,32 @@ const Index = () => {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full p-8 text-center space-y-4">
           <CheckCircle2 className="w-16 h-16 mx-auto text-primary" />
-          <h2 className="font-display text-2xl font-bold text-foreground uppercase tracking-wide">Booking Confirmed!</h2>
+          <h2 className="font-display text-2xl font-bold text-foreground uppercase tracking-wide">
+            Booking Confirmed!
+          </h2>
           <p className="text-muted-foreground">
-            Your slot on <span className="font-semibold text-foreground">{format(date, "EEEE, MMM d, yyyy")}</span> has been reserved.
+            Your slot on{" "}
+            <span className="font-semibold text-foreground">
+              {format(date, "EEEE, MMM d, yyyy")}
+            </span>{" "}
+            has been reserved.
           </p>
           {bookingResult?.bookingNumber && (
             <p className="text-sm text-muted-foreground">
               Booking #{bookingResult.bookingNumber}
             </p>
           )}
-          <Button onClick={() => { setSubmitted(false); setSelectedSlot(null); setSelectedSlotData(null); setLocationId(null); setLocationName(""); setBookingResult(null); }} className="mt-4">
+          <Button
+            onClick={() => {
+              setSubmitted(false);
+              setSelectedSlot(null);
+              setSelectedSlotData(null);
+              setLocationId(null);
+              setLocationName("");
+              setBookingResult(null);
+            }}
+            className="mt-4"
+          >
             Book Another Slot
           </Button>
         </Card>
@@ -166,48 +201,74 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-primary text-primary-foreground">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary-foreground/10 flex items-center justify-center">
-            <Target className="w-5 h-5 text-primary-foreground" />
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary-foreground/10 flex items-center justify-center shrink-0">
+              <Target className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="font-display text-lg sm:text-xl lg:text-2xl font-bold uppercase tracking-wider truncate">
+                {companyName}
+              </h1>
+              <p className="text-xs sm:text-sm text-primary-foreground/70">
+                Online Booking
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="font-display text-xl font-bold uppercase tracking-wider">
-              Pune Sport Academy
-            </h1>
-            <p className="text-xs text-primary-foreground/70">Shooting Range · Online Booking</p>
-          </div>
+
+          {/* Contact details bar */}
+          {(companyAddress || companyEmail || companyPhone) && (
+            <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-primary-foreground/15 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-5 text-xs sm:text-sm text-primary-foreground/80">
+              {companyAddress && (
+                <span className="flex items-start gap-1.5">
+                  <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span className="line-clamp-2 sm:line-clamp-1">{companyAddress}</span>
+                </span>
+              )}
+              {companyEmail && (
+                <span className="flex items-center gap-1.5 shrink-0">
+                  <Mail className="w-3.5 h-3.5 shrink-0" />
+                  {companyEmail}
+                </span>
+              )}
+              {companyPhone && (
+                <span className="flex items-center gap-1.5 shrink-0">
+                  <Phone className="w-3.5 h-3.5 shrink-0" />
+                  {companyPhone}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6 space-y-5 pb-28">
-        {/* Location */}
-        <div className="bg-card rounded-xl border border-border p-5 sm:p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <MapPin className="w-5 h-5 text-primary" />
-            <h2 className="font-display text-base font-semibold uppercase tracking-wider text-foreground">
-              Location
-            </h2>
-          </div>
-          <LocationSelect
-            companyBeUrl={config.companyBeUrl}
-            companyToken={config.companyToken}
-            onSelect={handleLocationSelect}
-            onLocationDetails={handleLocationDetails}
-          />
-        </div>
-
-        {/* Pick Your Slot */}
-        <div className="bg-card rounded-xl border border-border p-5 sm:p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Crosshair className="w-5 h-5 text-primary" />
-            <h2 className="font-display text-base font-semibold uppercase tracking-wider text-foreground">
-              Pick Your Slot
-            </h2>
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5 pb-28">
+        {/* Desktop: two-column layout for location + slot picker */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          {/* Location */}
+          <div className="bg-card rounded-xl border border-border p-5 sm:p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <MapPin className="w-5 h-5 text-primary" />
+              <h2 className="font-display text-base font-semibold uppercase tracking-wider text-foreground">
+                Location
+              </h2>
+            </div>
+            <LocationSelect
+              companyBeUrl={companyBeUrl}
+              companyToken={companyToken}
+              onSelect={handleLocationSelect}
+              onLocationDetails={handleLocationDetails}
+            />
           </div>
 
-          {/* Date Picker */}
-          <div className="mb-5">
-            <label className="text-sm text-muted-foreground mb-1.5 block">Date</label>
+          {/* Date Picker — sits beside location on large screens */}
+          <div className="bg-card rounded-xl border border-border p-5 sm:p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <CalendarIcon className="w-5 h-5 text-primary" />
+              <h2 className="font-display text-base font-semibold uppercase tracking-wider text-foreground">
+                Date
+              </h2>
+            </div>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -226,18 +287,28 @@ const Index = () => {
                   mode="single"
                   selected={date}
                   onSelect={handleDateChange}
-                  disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
+                  disabled={(d) =>
+                    d < new Date(new Date().setHours(0, 0, 0, 0))
+                  }
                   className="pointer-events-auto"
                 />
               </PopoverContent>
             </Popover>
           </div>
+        </div>
 
-          {/* Slots */}
+        {/* Pick Your Slot — full width */}
+        <div className="bg-card rounded-xl border border-border p-5 sm:p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Crosshair className="w-5 h-5 text-primary" />
+            <h2 className="font-display text-base font-semibold uppercase tracking-wider text-foreground">
+              Pick Your Slot
+            </h2>
+          </div>
           <SlotPicker
             date={date}
             locationId={locationId}
-            companyBeUrl={config.companyBeUrl}
+            companyBeUrl={companyBeUrl}
             slotDurationMinutes={slotDurationMinutes}
             selectedSlot={selectedSlot}
             onSelectSlot={handleSlotSelect}
@@ -250,7 +321,7 @@ const Index = () => {
 
       {/* Sticky Confirm Button */}
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border p-4">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-4xl mx-auto px-0 sm:px-2">
           <Button
             onClick={handleSubmit}
             size="lg"
@@ -258,9 +329,13 @@ const Index = () => {
             className="w-full font-display uppercase tracking-wider text-base h-12 gap-2"
           >
             {submitting ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</>
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" /> Submitting…
+              </>
             ) : (
-              <><Send className="w-4 h-4" /> Confirm Booking</>
+              <>
+                <Send className="w-4 h-4" /> Confirm Booking
+              </>
             )}
           </Button>
         </div>
