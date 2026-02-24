@@ -26,6 +26,7 @@ import BookingForm, { type BookingFormData } from "@/components/BookingForm";
 import { useToast } from "@/hooks/use-toast";
 import { useAppConfig } from "@/contexts/AppConfigContext";
 import { bookingBeService } from "@/services/bookingBeService";
+import { buildPayload } from "@/utils/booking";
 import type { Location } from "@/types/api";
 
 const Index = () => {
@@ -107,7 +108,10 @@ const Index = () => {
 
     setSubmitting(true);
     try {
-      const result = await bookingBeService.createBooking(companyBeUrl, {
+      const startDate = new Date(selectedSlotData.startISO);
+      const endDate = new Date(selectedSlotData.endISO);
+
+      const payload = buildPayload({
         locationId,
         locationName,
         contact: {
@@ -119,22 +123,19 @@ const Index = () => {
             line1: formData.addressLine1,
             line2: formData.addressLine2,
             city: formData.city,
-            state: formData.state,
-            zip: formData.zip,
+            pin: formData.zip,
           },
         },
-        bookingSchedule: [
-          {
-            startTime: selectedSlotData.startISO,
-            endTime: selectedSlotData.endISO,
-            totalMinutes: selectedSlotData.totalMinutes,
-          },
-        ],
         reasonOfBooking: formData.purpose,
         noOfPersons: formData.attendees,
         totalBillableAmount: 0,
-        urlToken: getConfig("companyEnrollmentCode") || companyToken,
+        start: startDate,
+        end: endDate,
+        companyEnrollmentCode: getConfig("companyEnrollmentCode") as string | undefined,
+        companyToken,
       });
+
+      const result = await bookingBeService.createBooking(companyBeUrl, payload as any);
 
       setBookingResult({
         bookingId: result.bookingId,
