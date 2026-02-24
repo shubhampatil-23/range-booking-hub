@@ -60,6 +60,11 @@ const Index = () => {
     phone: "",
     purpose: "",
     attendees: "1",
+    addressLine1: "",
+    addressLine2: "",
+    city: "",
+    state: "",
+    zip: "",
   });
 
   const handleDateChange = (d: Date | undefined) => {
@@ -110,6 +115,13 @@ const Index = () => {
           lastName: formData.lastName,
           email: formData.email,
           phone: formData.phone,
+          address: {
+            line1: formData.addressLine1,
+            line2: formData.addressLine2,
+            city: formData.city,
+            state: formData.state,
+            zip: formData.zip,
+          },
         },
         bookingSchedule: [
           {

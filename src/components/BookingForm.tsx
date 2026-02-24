@@ -10,6 +10,11 @@ export interface BookingFormData {
   phone: string;
   purpose: string;
   attendees: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  state: string;
+  zip: string;
 }
 
 interface BookingFormProps {
@@ -113,10 +118,57 @@ const BookingForm = ({ data, onChange }: BookingFormProps) => {
                 required
                 className="pl-9"
               />
-            </div>
+          </div>
+
+          {/* Address fields */}
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="addressLine1" className="text-muted-foreground text-sm">Address Line 1</Label>
+            <Input
+              id="addressLine1"
+              value={data.addressLine1}
+              onChange={(e) => update("addressLine1", e.target.value)}
+              placeholder="Street address"
+            />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="addressLine2" className="text-muted-foreground text-sm">Address Line 2</Label>
+            <Input
+              id="addressLine2"
+              value={data.addressLine2}
+              onChange={(e) => update("addressLine2", e.target.value)}
+              placeholder="Apt, suite, etc."
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="city" className="text-muted-foreground text-sm">City</Label>
+            <Input
+              id="city"
+              value={data.city}
+              onChange={(e) => update("city", e.target.value)}
+              placeholder="City"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="state" className="text-muted-foreground text-sm">State</Label>
+            <Input
+              id="state"
+              value={data.state}
+              onChange={(e) => update("state", e.target.value)}
+              placeholder="State"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="zip" className="text-muted-foreground text-sm">ZIP Code</Label>
+            <Input
+              id="zip"
+              value={data.zip}
+              onChange={(e) => update("zip", e.target.value)}
+              placeholder="ZIP"
+            />
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 };
