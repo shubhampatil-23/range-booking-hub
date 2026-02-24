@@ -37,6 +37,7 @@ const Index = () => {
   const companyAddress = getConfig("address") ?? "";
   const companyEmail = getConfig("email") ?? "";
   const companyPhone = getConfig("phone") ?? "";
+  const companyLogo = getConfig("logo") ?? "";
 
   const [date, setDate] = useState<Date>(new Date());
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
@@ -203,9 +204,17 @@ const Index = () => {
       <header className="bg-primary text-primary-foreground">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary-foreground/10 flex items-center justify-center shrink-0">
-              <Target className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
-            </div>
+            {companyLogo ? (
+              <img
+                src={companyLogo}
+                alt={companyName}
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover shrink-0"
+              />
+            ) : (
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary-foreground/10 flex items-center justify-center shrink-0">
+                <Target className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
+              </div>
+            )}
             <div className="min-w-0">
               <h1 className="font-display text-lg sm:text-xl lg:text-2xl font-bold uppercase tracking-wider truncate">
                 {companyName}
