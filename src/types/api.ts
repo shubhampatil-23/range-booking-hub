@@ -21,9 +21,32 @@ export interface Location {
   locationHours?: LocationHours[];
 }
 
+/** Find slotDuration (number) anywhere in object — handles nesting and snake_case */
+function findSlotDurationInObject(obj: unknown): number | null {
+  if (!obj || typeof obj !== "object") return null;
+  const record = obj as Record<string, unknown>;
+  const candidates = [
+    record.slotDuration,
+    record.slotDurationMinutes,
+    record.slotDurationInMinutes,
+    record.slot_duration,
+    record.slot_duration_minutes,
+  ];
+  for (const c of candidates) {
+    const n = typeof c === "string" ? parseInt(c, 10) : c;
+    if (typeof n === "number" && !Number.isNaN(n) && n > 0) return Math.floor(n);
+  }
+  for (const v of Object.values(record)) {
+    const found = findSlotDurationInObject(v);
+    if (found != null) return found;
+  }
+  return null;
+}
+
 /** Helper to normalise whichever field the backend sends */
 export function getSlotDuration(loc: Location): number {
-  return loc.slotDurationMinutes ?? loc.slotDurationInMinutes ?? loc.slotDuration ?? 60;
+  const found = findSlotDurationInObject(loc);
+  return found ?? 60;
 }
 
 // ── Booking ──────────────────────────────────────────────

@@ -1,0 +1,9 @@
+{
+  "rewrites": [
+    { "source": "/form/assets/:path*", "destination": "/assets/:path*" },
+    { "source": "/form/config.json", "destination": "/config.json" },
+    { "source": "/form", "destination": "/index.html" },
+    { "source": "/form/", "destination": "/index.html" },
+    { "source": "/form/:path*", "destination": "/index.html" }
+  ]
+}

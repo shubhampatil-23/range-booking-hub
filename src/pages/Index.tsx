@@ -111,6 +111,7 @@ const Index = () => {
     setLocationId(id);
     setLocationName(name);
     setLocation(null);
+    setDate(new Date());
     setSelectedSlot(null);
     setSelectedSlotData(null);
   };
@@ -326,11 +327,13 @@ const Index = () => {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
           <div className="flex items-center gap-3 sm:gap-4">
             {companyLogo ? (
-              <img
-                src={companyLogo}
-                alt={companyName}
-                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover shrink-0"
-              />
+              <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary-foreground/10 flex items-center justify-center shrink-0 overflow-hidden p-1">
+                <img
+                  src={companyLogo}
+                  alt={companyName}
+                  className="w-full h-full object-contain"
+                />
+              </div>
             ) : (
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary-foreground/10 flex items-center justify-center shrink-0">
                 <Target className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />

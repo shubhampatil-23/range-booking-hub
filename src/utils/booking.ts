@@ -28,8 +28,10 @@ export interface CreateBookingPayload {
 
 // ── Helpers ──────────────────────────────────────────────
 
-/** Format a Date to the backend's expected ISO pattern: 2026-02-21T09:00:00.000+0000 */
-export function formatDateForApi(d: Date): string {
+/** Convert to ISO 8601 UTC string for API (YYYY-MM-DDTHH:mm:ss.000+0000). Accepts Date or ISO string. */
+function toISODateString(value: Date | string): string {
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (isNaN(d.getTime())) return "";
   return d.toISOString().replace("Z", "+0000");
 }
 
@@ -41,8 +43,8 @@ export function buildPayload(input: {
   reasonOfBooking?: string;
   noOfPersons?: string | number;
   totalBillableAmount?: number;
-  start: Date;
-  end: Date;
+  start: Date | string;
+  end: Date | string;
   urlToken?: string;
   companyEnrollmentCode?: string;
   companyToken?: string;
@@ -61,18 +63,31 @@ export function buildPayload(input: {
     companyToken,
   } = input;
 
-  const totalMinutes = Math.round((end.getTime() - start.getTime()) / 60000);
+  const startDate = typeof start === "string" ? new Date(start) : start;
+  const endDate = typeof end === "string" ? new Date(end) : end;
+  const totalMinutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
 
   const token = urlToken ?? companyToken ?? companyEnrollmentCode;
+
+  // Ensure lastName, email, city are null (not empty string) when not provided
+  const contactPayload = {
+    ...contact,
+    lastName: contact.lastName?.trim() || null,
+    email: contact.email?.trim() || null,
+    address: {
+      ...(contact.address ?? {}),
+      city: contact.address?.city?.trim() || null,
+    },
+  };
 
   return {
     locationId,
     locationName,
-    contact,
+    contact: contactPayload,
     bookingSchedule: [
       {
-        startTime: formatDateForApi(start),
-        endTime: formatDateForApi(end),
+        startTime: toISODateString(start),
+        endTime: toISODateString(end),
         totalMinutes,
         allDay: false,
       },

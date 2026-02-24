@@ -39,6 +39,12 @@ function formatTime12(hour: number, min: number): string {
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")} ${suffix}`;
 }
 
+/** Create UTC ISO string from local date + time. Slot times (e.g. 10:00) are local; API expects UTC. */
+function localToUTCISO(date: Date, hour: number, min: number): string {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, min, 0, 0);
+  return d.toISOString().replace("Z", "+0000");
+}
+
 /** Parse "HH:mm" or "H:mm" to minutes since midnight */
 function parseTimeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
@@ -143,10 +149,6 @@ function slotsFromStartTimes(
   startTimes: string[],
   duration: number
 ): TimeSlot[] {
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-
   return startTimes.map((st, idx) => {
     const [h, m] = st.split(":").map(Number);
     const startH = h ?? 0;
@@ -156,8 +158,8 @@ function slotsFromStartTimes(
     const endH = Math.floor(endTotal / 60);
     const endM = endTotal % 60;
 
-    const startISO = `${yyyy}-${mm}-${dd}T${String(startH).padStart(2, "0")}:${String(startM).padStart(2, "0")}:00.000+0000`;
-    const endISO = `${yyyy}-${mm}-${dd}T${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}:00.000+0000`;
+    const startISO = localToUTCISO(date, startH, startM);
+    const endISO = localToUTCISO(date, endH, endM);
 
     return {
       id: `slot-${idx}`,
@@ -216,9 +218,6 @@ function generateSlotsFromDuration(
   closeMin: number
 ): TimeSlot[] {
   const slots: TimeSlot[] = [];
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
 
   let currentMin = openMin;
   let idx = 0;
@@ -230,8 +229,8 @@ function generateSlotsFromDuration(
     const endH = Math.floor(endTotal / 60);
     const endM = endTotal % 60;
 
-    const startISO = `${yyyy}-${mm}-${dd}T${String(startH).padStart(2, "0")}:${String(startM).padStart(2, "0")}:00.000+0000`;
-    const endISO = `${yyyy}-${mm}-${dd}T${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}:00.000+0000`;
+    const startISO = localToUTCISO(date, startH, startM);
+    const endISO = localToUTCISO(date, endH, endM);
 
     slots.push({
       id: `slot-${idx}`,
@@ -297,6 +296,7 @@ const SlotPicker = ({
   onSelectSlot,
 }: SlotPickerProps) => {
   const [slots, setSlots] = useState<TimeSlot[]>([]);
+  const [effectiveDuration, setEffectiveDuration] = useState<number>(slotDurationMinutes);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
@@ -304,6 +304,7 @@ const SlotPicker = ({
   useEffect(() => {
     if (!locationId) {
       setSlots([]);
+      setEffectiveDuration(slotDurationMinutes);
       setError(null);
       return;
     }
@@ -317,9 +318,10 @@ const SlotPicker = ({
         res: AvailabilityResponse,
         loc: Location | null
       ): TimeSlot[] => {
+        // Prefer location slotDuration from API (e.g. slotDuration: 30) over availability API or fallback
         const duration =
-          res.slotDurationMinutes ??
           (loc ? getSlotDuration(loc) : null) ??
+          res.slotDurationMinutes ??
           slotDurationMinutes;
         const bookedPeriods = res.bookedPeriods ?? [];
         const bookings = res.bookings ?? res.bookingSchedule ?? [];
@@ -337,6 +339,9 @@ const SlotPicker = ({
             openClose.openMin,
             openClose.closeMin
           );
+        } else if (loc && hours.length === 0) {
+          // Location has no locationHours — do not show slots
+          rawSlots = [];
         } else if (hours.length > 0) {
           rawSlots = [];
         } else if (res.startTimes && res.startTimes.length > 0) {
@@ -344,9 +349,6 @@ const SlotPicker = ({
         } else if (res.availablePeriods && res.availablePeriods.length > 0) {
           rawSlots = slotsFromAvailablePeriods(res.availablePeriods, duration);
         } else {
-          if (import.meta.env.DEV && loc) {
-            console.warn("[SlotPicker] Using 9–5 fallback: no locationHours for", format(date, "EEEE"), "loc keys:", Object.keys(loc as object).join(", "));
-          }
           rawSlots = generateSlotsFromDuration(
             date,
             duration,
@@ -380,31 +382,41 @@ const SlotPicker = ({
         .then(([res, loc]) => {
           const locToUse = loc ?? location;
           const built = tryBuildSlots(res, locToUse);
+          const duration =
+            (locToUse ? getSlotDuration(locToUse) : null) ??
+            res.slotDurationMinutes ??
+            slotDurationMinutes;
           setSlots(built);
+          setEffectiveDuration(duration);
         })
         .catch(() =>
           getLocationWithHours().then((loc) => {
+            const duration =
+              (loc ? getSlotDuration(loc) : null) ?? slotDurationMinutes;
             const hours = getLocationHoursArray(loc);
             const openClose = loc ? getOpenCloseForDate(date, hours, loc) : null;
             if (openClose) {
               const rawSlots = generateSlotsFromDuration(
                 date,
-                slotDurationMinutes,
+                duration,
                 openClose.openMin,
                 openClose.closeMin
               );
               setSlots(rawSlots.map((s) => ({ ...s, booked: false })));
+            } else if (loc && hours.length === 0) {
+              setSlots([]);
             } else if (hours.length > 0) {
               setSlots([]);
             } else {
               const defaultSlots = generateSlotsFromDuration(
                 date,
-                slotDurationMinutes,
+                duration,
                 DEFAULT_OPEN_MIN,
                 DEFAULT_CLOSE_MIN
               );
               setSlots(defaultSlots.map((s) => ({ ...s, booked: false })));
             }
+            setEffectiveDuration(duration);
             setError(null);
           })
         )
@@ -453,7 +465,7 @@ const SlotPicker = ({
         <p className="text-sm font-medium text-primary">
           Available Slots for {format(date, "d MMM yyyy")}
         </p>
-        <span className="text-xs text-muted-foreground">{slotDurationMinutes} min / slot</span>
+        <span className="text-xs text-muted-foreground">{effectiveDuration} min / slot</span>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3">

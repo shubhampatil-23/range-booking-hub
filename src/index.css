@@ -93,4 +93,11 @@
   body {
     @apply bg-background text-foreground font-sans;
   }
+
+  /* Hide Lovable App badge/widget */
+  #lovable-badge,
+  [id*="lovable"],
+  [class*="lovable-badge"] {
+    display: none !important;
+  }
 }

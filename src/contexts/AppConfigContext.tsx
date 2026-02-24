@@ -60,9 +60,8 @@ const AppConfigContext = createContext<AppConfigContextValue | undefined>(
 
 // ── Provider ────────────────────────────────────────────────
 export const AppConfigProvider: React.FC<{
-  url?: string;
   children: React.ReactNode;
-}> = ({ url = "/config.json", children }) => {
+}> = ({ children }) => {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -87,9 +86,10 @@ export const AppConfigProvider: React.FC<{
     }
 
     // 2️⃣  Fetch config.json (once)
-    fetch(url)
+    const configUrl = import.meta.env.BASE_URL + "config.json";
+    fetch(configUrl)
       .then((r) => {
-        if (!r.ok) throw new Error(`Failed to load ${url}: ${r.status}`);
+        if (!r.ok) throw new Error(`Failed to load ${configUrl}: ${r.status}`);
         return r.json();
       })
       .then((data) => {
@@ -109,7 +109,7 @@ export const AppConfigProvider: React.FC<{
     return () => {
       mounted = false;
     };
-  }, [url]);
+  }, []);
 
   const value: AppConfigContextValue = {
     config,
