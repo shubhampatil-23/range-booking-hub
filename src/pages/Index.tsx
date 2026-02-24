@@ -252,58 +252,55 @@ const Index = () => {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5 pb-28">
-        {/* Desktop: two-column layout for location + slot picker */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* Location */}
-          <div className="bg-card rounded-xl border border-border p-5 sm:p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <MapPin className="w-5 h-5 text-primary" />
-              <h2 className="font-display text-base font-semibold uppercase tracking-wider text-foreground">
-                Location
-              </h2>
-            </div>
-            <LocationSelect
-              companyBeUrl={companyBeUrl}
-              companyToken={companyToken}
-              onSelect={handleLocationSelect}
-              onLocationDetails={handleLocationDetails}
-            />
+        {/* Location */}
+        <div className="bg-card rounded-xl border border-border p-5 sm:p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <MapPin className="w-5 h-5 text-primary" />
+            <h2 className="font-display text-base font-semibold uppercase tracking-wider text-foreground">
+              Location
+            </h2>
           </div>
+          <LocationSelect
+            companyBeUrl={companyBeUrl}
+            companyToken={companyToken}
+            onSelect={handleLocationSelect}
+            onLocationDetails={handleLocationDetails}
+          />
+        </div>
 
-          {/* Date Picker — sits beside location on large screens */}
-          <div className="bg-card rounded-xl border border-border p-5 sm:p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <CalendarIcon className="w-5 h-5 text-primary" />
-              <h2 className="font-display text-base font-semibold uppercase tracking-wider text-foreground">
-                Date
-              </h2>
-            </div>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-medium h-11",
-                    !date && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                  {format(date, "EEEE, d MMMM yyyy")}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={handleDateChange}
-                  disabled={(d) =>
-                    d < new Date(new Date().setHours(0, 0, 0, 0))
-                  }
-                  className="pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
+        {/* Date */}
+        <div className="bg-card rounded-xl border border-border p-5 sm:p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <CalendarIcon className="w-5 h-5 text-accent" />
+            <h2 className="font-display text-base font-semibold uppercase tracking-wider text-foreground">
+              Date
+            </h2>
           </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={cn(
+                  "w-full justify-start text-left font-medium h-11 bg-accent text-accent-foreground border-accent hover:bg-accent/90",
+                  !date && "text-accent-foreground/70"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {format(date, "EEEE, d MMMM yyyy")}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={handleDateChange}
+                disabled={(d) =>
+                  d < new Date(new Date().setHours(0, 0, 0, 0))
+                }
+                className="pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
         </div>
 
         {/* Pick Your Slot — full width */}

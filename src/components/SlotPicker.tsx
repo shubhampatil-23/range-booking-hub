@@ -149,8 +149,7 @@ const SlotPicker = ({
 
           setSlots(withAvailability);
         })
-        .catch((err) => {
-          setError(err?.message ?? "Failed to load availability");
+        .catch(() => {
           // Fallback: show generated slots without booking info
           setSlots(generateSlotsFromDuration(date, slotDurationMinutes));
         })
