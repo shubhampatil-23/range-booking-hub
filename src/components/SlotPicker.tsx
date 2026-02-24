@@ -179,7 +179,9 @@ const SlotPicker = ({
 
   if (error) {
     return (
-      <p className="text-sm text-destructive py-4 text-center">{error}</p>
+      <p className="text-sm text-muted-foreground py-4 text-center">
+        Slots unavailable. Please try again later.
+      </p>
     );
   }
 
