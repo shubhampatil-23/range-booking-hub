@@ -1,11 +1,10 @@
-import { useState } from "react";
 import { format } from "date-fns";
+import { Clock, X } from "lucide-react";
 
 export interface TimeSlot {
   id: string;
   startTime: string;
   endTime: string;
-  label: string;
   booked: boolean;
 }
 
@@ -14,25 +13,21 @@ const generateSlots = (): TimeSlot[] => {
   const startHour = 8;
   const endHour = 18;
   for (let h = startHour; h < endHour; h += 2) {
-    const start = h;
-    const end = h + 2;
     const fmt = (hour: number) => {
       const suffix = hour >= 12 ? "PM" : "AM";
       const display = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-      return `${display}:00 ${suffix}`;
+      return `${display.toString().padStart(2, "0")}:00 ${suffix}`;
     };
     slots.push({
       id: `slot-${h}`,
-      startTime: fmt(start),
-      endTime: fmt(end),
-      label: `${fmt(start)} – ${fmt(end)}`,
+      startTime: fmt(h),
+      endTime: fmt(h + 2),
       booked: false,
     });
   }
   return slots;
 };
 
-// Simulate some booked slots per date
 const getBookedSlotIds = (date: Date): string[] => {
   const day = date.getDate();
   if (day % 3 === 0) return ["slot-10", "slot-14"];
@@ -57,13 +52,14 @@ const SlotPicker = ({ date, selectedSlot, onSelectSlot }: SlotPickerProps) => {
 
   return (
     <div>
-      <p className="text-sm font-medium text-muted-foreground mb-1">
-        Slots for {format(date, "EEEE, MMM d")}
-      </p>
-      <p className="text-xs text-muted-foreground mb-4">
-        Open Hours: 8:00 AM – 6:00 PM · Slot Duration: 2 hrs
-      </p>
-      <div className="grid grid-cols-1 gap-2">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-medium text-primary">
+          Available Slots for {format(date, "d MMM yyyy")}
+        </p>
+        <span className="text-xs text-muted-foreground">2 hr / slot</span>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {slots.map((slot, i) => {
           const isSelected = selectedSlot === slot.id;
           const isBooked = slot.booked;
@@ -74,41 +70,54 @@ const SlotPicker = ({ date, selectedSlot, onSelectSlot }: SlotPickerProps) => {
               disabled={isBooked}
               onClick={() => onSelectSlot(slot.id)}
               className={`
-                relative flex items-center justify-between px-4 py-3 rounded-lg border-2 text-sm font-medium transition-all duration-150 animate-slot-pop
+                relative flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 transition-all duration-150 animate-slot-pop
                 ${
                   isBooked
-                    ? "bg-slot-booked border-slot-booked-border text-slot-booked-text cursor-not-allowed opacity-60"
+                    ? "bg-slot-booked border-slot-booked-border cursor-not-allowed"
                     : isSelected
-                    ? "bg-slot-selected border-slot-selected text-slot-selected-text shadow-md scale-[1.02]"
-                    : "bg-slot-available border-slot-available-border text-slot-available-text hover:border-primary hover:shadow-sm cursor-pointer"
+                    ? "bg-slot-selected border-slot-selected text-slot-selected-text shadow-lg scale-[1.03]"
+                    : "bg-card border-border hover:border-primary hover:shadow-md cursor-pointer"
                 }
               `}
-              style={{ animationDelay: `${i * 40}ms`, animationFillMode: "both" }}
+              style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}
             >
-              <span className="font-semibold">{slot.label}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${
-                isBooked
-                  ? "bg-destructive/10 text-destructive"
-                  : isSelected
-                  ? "bg-primary-foreground/20 text-primary-foreground"
-                  : "bg-primary/10 text-primary"
+              <Clock
+                className={`w-5 h-5 ${
+                  isBooked
+                    ? "text-destructive"
+                    : isSelected
+                    ? "text-slot-selected-text"
+                    : "text-primary"
+                }`}
+              />
+              <span className={`text-base font-bold ${
+                isBooked ? "text-destructive" : isSelected ? "text-slot-selected-text" : "text-foreground"
               }`}>
-                {isBooked ? "Booked" : isSelected ? "Selected ✓" : "Available"}
+                {slot.startTime}
+              </span>
+              <span className={`text-xs ${
+                isBooked ? "text-slot-booked-text" : isSelected ? "text-slot-selected-text/80" : "text-muted-foreground"
+              }`}>
+                to {slot.endTime}
+              </span>
+              <span className={`text-xs font-medium flex items-center gap-1 ${
+                isBooked
+                  ? "text-destructive"
+                  : isSelected
+                  ? "text-slot-selected-text"
+                  : "text-primary"
+              }`}>
+                {isBooked ? (
+                  <><X className="w-3 h-3" /> Booked</>
+                ) : isSelected ? (
+                  "Selected ✓"
+                ) : (
+                  "Available"
+                )}
               </span>
             </button>
           );
         })}
-      </div>
-      <div className="flex gap-4 mt-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-slot-available border border-slot-available-border" /> Available
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-slot-booked border border-slot-booked-border" /> Booked
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-slot-selected" /> Selected
-        </span>
       </div>
     </div>
   );
