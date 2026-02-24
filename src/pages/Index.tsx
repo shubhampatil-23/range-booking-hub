@@ -106,6 +106,17 @@ const Index = () => {
       return;
     }
 
+    const phoneRegex = /^\+?[0-9\s\-]{7,15}$/;
+    if (!phoneRegex.test(formData.phone.trim())) {
+      toast({ title: "Invalid phone number", description: "Enter a valid phone (7–15 digits)", variant: "destructive" });
+      return;
+    }
+
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+      toast({ title: "Invalid email", description: "Please enter a valid email address", variant: "destructive" });
+      return;
+    }
+
     setSubmitting(true);
     try {
       const startDate = new Date(selectedSlotData.startISO);
