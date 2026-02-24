@@ -176,36 +176,80 @@ const Index = () => {
   if (submitted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <Card className="max-w-md w-full p-8 text-center space-y-4">
-          <CheckCircle2 className="w-16 h-16 mx-auto text-primary" />
-          <h2 className="font-display text-2xl font-bold text-foreground uppercase tracking-wide">
-            Booking Confirmed!
-          </h2>
-          <p className="text-muted-foreground">
-            Your slot on{" "}
-            <span className="font-semibold text-foreground">
-              {format(date, "EEEE, MMM d, yyyy")}
-            </span>{" "}
-            has been reserved.
-          </p>
-          {bookingResult?.bookingNumber && (
-            <p className="text-sm text-muted-foreground">
-              Booking #{bookingResult.bookingNumber}
+        <Card className="max-w-md w-full p-8 text-center space-y-6 border-primary/20">
+          {/* Animated check */}
+          <div className="mx-auto w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center ring-4 ring-primary/20">
+            <CheckCircle2 className="w-12 h-12 text-primary" />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="font-display text-2xl font-bold text-foreground uppercase tracking-wide">
+              Booking Confirmed!
+            </h2>
+            <p className="text-muted-foreground">
+              Your slot on{" "}
+              <span className="font-semibold text-foreground">
+                {format(date, "EEEE, MMM d, yyyy")}
+              </span>{" "}
+              at <span className="font-semibold text-foreground">{locationName}</span> has been reserved.
             </p>
-          )}
-          <Button
-            onClick={() => {
-              setSubmitted(false);
-              setSelectedSlot(null);
-              setSelectedSlotData(null);
-              setLocationId(null);
-              setLocationName("");
-              setBookingResult(null);
-            }}
-            className="mt-4"
-          >
-            Book Another Slot
-          </Button>
+          </div>
+
+          {/* Booking details card */}
+          <div className="bg-muted/50 rounded-lg p-4 text-left space-y-2 text-sm">
+            {bookingResult?.bookingNumber && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Booking #</span>
+                <span className="font-bold text-foreground">{bookingResult.bookingNumber}</span>
+              </div>
+            )}
+            {bookingResult?.bookingId && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Reference</span>
+                <span className="font-mono text-xs text-foreground">{bookingResult.bookingId}</span>
+              </div>
+            )}
+            {selectedSlotData && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Time</span>
+                <span className="font-semibold text-foreground">
+                  {selectedSlotData.startTime} – {selectedSlotData.endTime}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Name</span>
+              <span className="text-foreground">{formData.firstName} {formData.lastName}</span>
+            </div>
+            {formData.phone && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Phone</span>
+                <span className="text-foreground">{formData.phone}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-3 pt-2">
+            <Button
+              onClick={() => {
+                setSubmitted(false);
+                setSelectedSlot(null);
+                setSelectedSlotData(null);
+                setLocationId(null);
+                setLocationName("");
+                setBookingResult(null);
+                setFormData({
+                  firstName: "", lastName: "", email: "", phone: "",
+                  purpose: "", attendees: "1",
+                  addressLine1: "", addressLine2: "", city: "", state: "", zip: "",
+                });
+              }}
+              className="w-full font-display uppercase tracking-wider gap-2"
+              size="lg"
+            >
+              <CalendarIcon className="w-4 h-4" /> Book Another Slot
+            </Button>
+          </div>
         </Card>
       </div>
     );
