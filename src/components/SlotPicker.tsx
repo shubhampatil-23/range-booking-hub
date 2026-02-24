@@ -193,7 +193,7 @@ const SlotPicker = ({
         <span className="text-xs text-muted-foreground">{slotDurationMinutes} min / slot</span>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3">
         {slots.map((slot, i) => {
           const isSelected = selectedSlot === slot.id;
           const isBooked = slot.booked;
@@ -204,42 +204,42 @@ const SlotPicker = ({
               disabled={isBooked}
               onClick={() => onSelectSlot(slot.id, slot)}
               className={`
-                relative flex flex-col items-center gap-1.5 p-4 rounded-xl border-2 transition-all duration-150 animate-slot-pop
+                relative flex flex-col items-center gap-1 p-3 sm:p-4 rounded-lg border transition-all duration-150 animate-slot-pop
                 ${
                   isBooked
-                    ? "bg-slot-booked border-slot-booked-border cursor-not-allowed"
+                    ? "bg-slot-booked border-slot-booked-border cursor-not-allowed opacity-60"
                     : isSelected
-                    ? "bg-slot-selected border-slot-selected text-slot-selected-text shadow-lg scale-[1.03]"
-                    : "bg-card border-border hover:border-primary hover:shadow-md cursor-pointer"
+                    ? "bg-primary border-primary text-primary-foreground shadow-lg ring-2 ring-primary/30 scale-[1.02]"
+                    : "bg-muted/40 border-border hover:border-primary/60 hover:shadow-sm cursor-pointer"
                 }
               `}
-              style={{ animationDelay: `${i * 50}ms`, animationFillMode: "both" }}
+              style={{ animationDelay: `${i * 30}ms`, animationFillMode: "both" }}
             >
               <Clock
-                className={`w-5 h-5 ${
+                className={`w-4 h-4 sm:w-5 sm:h-5 ${
                   isBooked
                     ? "text-destructive"
                     : isSelected
-                    ? "text-slot-selected-text"
-                    : "text-primary"
+                    ? "text-primary-foreground/80"
+                    : "text-muted-foreground"
                 }`}
               />
-              <span className={`text-base font-bold ${
-                isBooked ? "text-destructive" : isSelected ? "text-slot-selected-text" : "text-foreground"
+              <span className={`text-sm sm:text-base font-bold leading-tight ${
+                isBooked ? "text-destructive" : isSelected ? "text-primary-foreground" : "text-foreground"
               }`}>
                 {slot.startTime}
               </span>
-              <span className={`text-xs ${
-                isBooked ? "text-slot-booked-text" : isSelected ? "text-slot-selected-text/80" : "text-muted-foreground"
+              <span className={`text-[10px] sm:text-xs leading-tight ${
+                isBooked ? "text-slot-booked-text" : isSelected ? "text-primary-foreground/70" : "text-muted-foreground"
               }`}>
                 to {slot.endTime}
               </span>
-              <span className={`text-xs font-medium flex items-center gap-1 ${
+              <span className={`text-[10px] sm:text-xs font-semibold flex items-center gap-0.5 ${
                 isBooked
                   ? "text-destructive"
                   : isSelected
-                  ? "text-slot-selected-text"
-                  : "text-primary"
+                  ? "text-primary-foreground"
+                  : "text-accent"
               }`}>
                 {isBooked ? (
                   <><X className="w-3 h-3" /> Booked</>
