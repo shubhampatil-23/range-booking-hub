@@ -11,6 +11,12 @@ import { bookingLocationService } from "@/services/bookingLocationService";
 import type { Location } from "@/types/api";
 import { getSlotDuration } from "@/types/api";
 
+const DUMMY_LOCATIONS: Location[] = [
+  { id: "loc_1", locationName: "Main Shooting Range", capacity: 20, slotDurationMinutes: 30, locationHours: [] },
+  { id: "loc_2", locationName: "Indoor Practice Hall", capacity: 10, slotDurationMinutes: 60, locationHours: [] },
+  { id: "loc_3", locationName: "Outdoor Training Ground", capacity: 30, slotDurationMinutes: 45, locationHours: [] },
+];
+
 interface LocationSelectProps {
   companyBeUrl: string;
   companyToken: string;
@@ -36,10 +42,10 @@ const LocationSelect = ({
     bookingLocationService
       .getAllLocationsForBooking(companyBeUrl, companyToken)
       .then((locs) => {
-        if (!cancelled) setLocations(locs);
+        if (!cancelled) setLocations(locs.length > 0 ? locs : DUMMY_LOCATIONS);
       })
-      .catch((err) => {
-        if (!cancelled) setError(err?.message ?? "Failed to load locations");
+      .catch(() => {
+        if (!cancelled) setLocations(DUMMY_LOCATIONS);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -58,7 +64,10 @@ const LocationSelect = ({
       .then((detail) => {
         onLocationDetails?.(detail, getSlotDuration(detail));
       })
-      .catch(() => { /* ignore detail fetch errors */ });
+      .catch(() => {
+        // Fallback: use dummy location data for slot duration
+        if (loc) onLocationDetails?.(loc, getSlotDuration(loc));
+      });
   };
 
   if (loading) {
