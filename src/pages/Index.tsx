@@ -69,6 +69,7 @@ const Index = () => {
   const [invalidField, setInvalidField] = useState<string | null>(null);
   const confirmationCardRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   const handleDownloadImage = async () => {
     if (!confirmationCardRef.current) return;
@@ -104,6 +105,7 @@ const Index = () => {
       setDate(d);
       setSelectedSlot(null);
       setSelectedSlotData(null);
+      setDatePickerOpen(false);
     }
   };
 
@@ -401,7 +403,7 @@ const Index = () => {
               Date
             </h2>
           </div>
-          <Popover>
+          <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
