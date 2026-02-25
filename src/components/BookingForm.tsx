@@ -39,6 +39,7 @@ function BookingForm({ data, onChange, invalidField, onFieldChange }: BookingFor
               value={data.purpose}
               onChange={(e) => update("purpose", e.target.value)}
               placeholder="Practice, Training..."
+              maxLength={20}
               required
               className={cn(invalidField === "purpose" ? err : "")}
             />
