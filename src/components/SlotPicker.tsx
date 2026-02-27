@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { format } from "date-fns";
+import { format, isToday } from "date-fns";
 import { enUS } from "date-fns/locale";
 import { Clock, X, Loader2 } from "lucide-react";
 import { bookingAvailabilityService } from "@/services/bookingAvailabilityService";
@@ -249,6 +249,13 @@ function generateSlotsFromDuration(
   return slots;
 }
 
+/** When date is today, filter out slots whose start time has already passed */
+function filterPastSlotsIfToday(date: Date, slots: TimeSlot[]): TimeSlot[] {
+  if (!isToday(date)) return slots;
+  const now = new Date();
+  return slots.filter((slot) => new Date(slot.startISO) > now);
+}
+
 function isSlotBooked(
   slot: TimeSlot,
   bookedPeriods: AvailablePeriod[],
@@ -357,10 +364,11 @@ const SlotPicker = ({
           );
         }
 
-        return rawSlots.map((slot) => ({
+        const withBooked = rawSlots.map((slot) => ({
           ...slot,
           booked: isSlotBooked(slot, bookedPeriods, bookings),
         }));
+        return filterPastSlotsIfToday(date, withBooked);
       };
 
       const getLocationWithHours = (): Promise<Location | null> => {
@@ -402,7 +410,11 @@ const SlotPicker = ({
                 openClose.openMin,
                 openClose.closeMin
               );
-              setSlots(rawSlots.map((s) => ({ ...s, booked: false })));
+              const filtered = filterPastSlotsIfToday(
+                date,
+                rawSlots.map((s) => ({ ...s, booked: false }))
+              );
+              setSlots(filtered);
             } else if (loc && hours.length === 0) {
               setSlots([]);
             } else if (hours.length > 0) {
@@ -414,7 +426,11 @@ const SlotPicker = ({
                 DEFAULT_OPEN_MIN,
                 DEFAULT_CLOSE_MIN
               );
-              setSlots(defaultSlots.map((s) => ({ ...s, booked: false })));
+              const filtered = filterPastSlotsIfToday(
+                date,
+                defaultSlots.map((s) => ({ ...s, booked: false }))
+              );
+              setSlots(filtered);
             }
             setEffectiveDuration(duration);
             setError(null);
