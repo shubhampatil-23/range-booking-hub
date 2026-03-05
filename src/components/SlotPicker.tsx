@@ -285,8 +285,8 @@ interface SlotPickerProps {
   location: Location | null;
   companyBeUrl: string;
   slotDurationMinutes: number;
-  selectedSlot: string | null;
-  onSelectSlot: (slotId: string, slot: TimeSlot) => void;
+  selectedSlots: string[];
+  onToggleSlot: (slotId: string, slot: TimeSlot) => void;
 }
 
 /** Default business hours (9 AM - 5 PM) when API/location has no data */
@@ -299,8 +299,8 @@ const SlotPicker = ({
   location,
   companyBeUrl,
   slotDurationMinutes,
-  selectedSlot,
-  onSelectSlot,
+  selectedSlots,
+  onToggleSlot,
 }: SlotPickerProps) => {
   const [slots, setSlots] = useState<TimeSlot[]>([]);
   const [effectiveDuration, setEffectiveDuration] = useState<number>(slotDurationMinutes);
@@ -484,16 +484,19 @@ const SlotPicker = ({
         <span className="text-xs text-muted-foreground">{effectiveDuration} min / slot</span>
       </div>
 
+      <p className="text-xs text-muted-foreground mb-2">
+        Click slots to select multiple. Selected: {selectedSlots.length}
+      </p>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-3">
         {slots.map((slot, i) => {
-          const isSelected = selectedSlot === slot.id;
+          const isSelected = selectedSlots.includes(slot.id);
           const isBooked = slot.booked;
 
           return (
             <button
               key={slot.id}
               disabled={isBooked}
-              onClick={() => onSelectSlot(slot.id, slot)}
+              onClick={() => onToggleSlot(slot.id, slot)}
               className={`
                 relative flex flex-col items-center gap-1 p-3 sm:p-4 rounded-lg border transition-all duration-150 animate-slot-pop
                 ${
@@ -537,7 +540,7 @@ const SlotPicker = ({
                 ) : isSelected ? (
                   "Selected ✓"
                 ) : (
-                  "Available"
+                  "Click to select"
                 )}
               </span>
             </button>

@@ -10,8 +10,8 @@ interface SlotSectionProps {
   location: Location | null;
   companyBeUrl: string;
   slotDurationMinutes: number;
-  selectedSlot: string | null;
-  onSelectSlot: (slotId: string, slot: TimeSlot) => void;
+  selectedSlots: string[];
+  onToggleSlot: (slotId: string, slot: TimeSlot) => void;
 }
 
 const SlotSection = ({
@@ -20,8 +20,8 @@ const SlotSection = ({
   location,
   companyBeUrl,
   slotDurationMinutes,
-  selectedSlot,
-  onSelectSlot,
+  selectedSlots,
+  onToggleSlot,
 }: SlotSectionProps) => {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -58,8 +58,8 @@ const SlotSection = ({
           location={location}
           companyBeUrl={companyBeUrl}
           slotDurationMinutes={slotDurationMinutes}
-          selectedSlot={selectedSlot}
-          onSelectSlot={onSelectSlot}
+          selectedSlots={selectedSlots}
+          onToggleSlot={onToggleSlot}
         />
       </div>
     </div>

@@ -35,7 +35,22 @@ function toISODateString(value: Date | string): string {
   return d.toISOString().replace("Z", "+0000");
 }
 
-/** Build a ready-to-POST booking payload from validated form values */
+/** Build bookingSchedule array from multiple slots (start/end pairs) */
+function buildBookingSchedule(slots: { start: Date | string; end: Date | string }[]): BookingSchedule[] {
+  return slots.map(({ start, end }) => {
+    const startDate = typeof start === "string" ? new Date(start) : start;
+    const endDate = typeof end === "string" ? new Date(end) : end;
+    const totalMinutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
+    return {
+      startTime: toISODateString(start),
+      endTime: toISODateString(end),
+      totalMinutes,
+      allDay: false,
+    };
+  });
+}
+
+/** Build a ready-to-POST booking payload from validated form values (single or multiple slots) */
 export function buildPayload(input: {
   locationId: string;
   locationName?: string;
@@ -43,8 +58,9 @@ export function buildPayload(input: {
   reasonOfBooking?: string;
   noOfPersons?: string | number;
   totalBillableAmount?: number;
-  start: Date | string;
-  end: Date | string;
+  start?: Date | string;
+  end?: Date | string;
+  slots?: { start: Date | string; end: Date | string }[];
   urlToken?: string;
   companyEnrollmentCode?: string;
   companyToken?: string;
@@ -58,14 +74,11 @@ export function buildPayload(input: {
     totalBillableAmount,
     start,
     end,
+    slots,
     urlToken,
     companyEnrollmentCode,
     companyToken,
   } = input;
-
-  const startDate = typeof start === "string" ? new Date(start) : start;
-  const endDate = typeof end === "string" ? new Date(end) : end;
-  const totalMinutes = Math.round((endDate.getTime() - startDate.getTime()) / 60000);
 
   const token = urlToken ?? companyToken ?? companyEnrollmentCode;
 
@@ -80,18 +93,17 @@ export function buildPayload(input: {
     },
   };
 
+  const bookingSchedule = slots?.length
+    ? buildBookingSchedule(slots)
+    : start != null && end != null
+      ? buildBookingSchedule([{ start, end }])
+      : [];
+
   return {
     locationId,
     locationName,
     contact: contactPayload,
-    bookingSchedule: [
-      {
-        startTime: toISODateString(start),
-        endTime: toISODateString(end),
-        totalMinutes,
-        allDay: false,
-      },
-    ],
+    bookingSchedule,
     reasonOfBooking,
     noOfPersons:
       typeof noOfPersons === "number" ? String(noOfPersons) : noOfPersons,

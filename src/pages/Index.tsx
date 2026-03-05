@@ -43,8 +43,8 @@ const Index = () => {
   const companyLogo = getConfig("logo") ?? "";
 
   const [date, setDate] = useState<Date>(new Date());
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
-  const [selectedSlotData, setSelectedSlotData] = useState<TimeSlot | null>(null);
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
+  const [selectedSlotsData, setSelectedSlotsData] = useState<TimeSlot[]>([]);
   const [locationId, setLocationId] = useState<string | null>(null);
   const [locationName, setLocationName] = useState<string>("");
   const [location, setLocation] = useState<Location | null>(null);
@@ -80,7 +80,7 @@ const Index = () => {
         pixelRatio: 2,
       });
       const link = document.createElement("a");
-      link.download = `booking-confirmation-${bookingResult?.bookingNumber ?? "slot"}.png`;
+      link.download = `booking-confirmation-${bookingResult?.bookingNumber ?? "booking"}.png`;
       link.href = dataUrl;
       link.click();
       toast({ title: "Image downloaded", description: "Booking confirmation saved." });
@@ -103,8 +103,8 @@ const Index = () => {
   const handleDateChange = (d: Date | undefined) => {
     if (d) {
       setDate(d);
-      setSelectedSlot(null);
-      setSelectedSlotData(null);
+      setSelectedSlots([]);
+      setSelectedSlotsData([]);
       setDatePickerOpen(false);
     }
   };
@@ -114,8 +114,8 @@ const Index = () => {
     setLocationName(name);
     setLocation(null);
     setDate(new Date());
-    setSelectedSlot(null);
-    setSelectedSlotData(null);
+    setSelectedSlots([]);
+    setSelectedSlotsData([]);
   };
 
   const handleLocationDetails = (loc: Location, duration: number) => {
@@ -123,9 +123,15 @@ const Index = () => {
     setSlotDurationMinutes(duration);
   };
 
-  const handleSlotSelect = (slotId: string, slot: TimeSlot) => {
-    setSelectedSlot(slotId);
-    setSelectedSlotData(slot);
+  const handleToggleSlot = (slotId: string, slot: TimeSlot) => {
+    setSelectedSlots((prev) =>
+      prev.includes(slotId) ? prev.filter((id) => id !== slotId) : [...prev, slotId]
+    );
+    setSelectedSlotsData((prev) => {
+      const exists = prev.some((s) => s.id === slotId);
+      if (exists) return prev.filter((s) => s.id !== slotId);
+      return [...prev, slot];
+    });
   };
 
   const handleSubmit = async () => {
@@ -133,8 +139,8 @@ const Index = () => {
       toast({ title: "Please select a location", variant: "destructive" });
       return;
     }
-    if (!selectedSlotData) {
-      toast({ title: "Please select a time slot", variant: "destructive" });
+    if (selectedSlotsData.length === 0) {
+      toast({ title: "Please select at least one time slot", variant: "destructive" });
       return;
     }
     if (!formData.firstName || !formData.phone || !formData.purpose) {
@@ -159,9 +165,6 @@ const Index = () => {
 
     setSubmitting(true);
     try {
-      const startDate = new Date(selectedSlotData.startISO);
-      const endDate = new Date(selectedSlotData.endISO);
-
       const payload = buildPayload({
         locationId,
         locationName,
@@ -177,8 +180,9 @@ const Index = () => {
         reasonOfBooking: formData.purpose,
         noOfPersons: formData.attendees,
         totalBillableAmount: 0,
-        start: startDate,
-        end: endDate,
+        slots: [...selectedSlotsData]
+          .sort((a, b) => new Date(a.startISO).getTime() - new Date(b.startISO).getTime())
+          .map((s) => ({ start: s.startISO, end: s.endISO })),
         urlToken: getConfig("urlToken") as string | undefined,
         companyEnrollmentCode: getConfig("companyEnrollmentCode") as string | undefined,
         companyToken,
@@ -237,11 +241,12 @@ const Index = () => {
                 Booking Confirmed!
               </h2>
               <p className="text-muted-foreground">
-                Your slot on{" "}
+                Your {selectedSlotsData.length} slot{selectedSlotsData.length !== 1 ? "s" : ""} on{" "}
                 <span className="font-semibold text-foreground">
                   {format(date, "EEEE, MMM d, yyyy")}
                 </span>{" "}
-                at <span className="font-semibold text-foreground">{locationName}</span> has been reserved.
+                at <span className="font-semibold text-foreground">{locationName}</span>{" "}
+                {selectedSlotsData.length !== 1 ? "have" : "has"} been reserved.
               </p>
             </div>
 
@@ -259,12 +264,18 @@ const Index = () => {
                   <span className="font-mono text-xs text-foreground">{bookingResult.bookingId}</span>
                 </div>
               )}
-              {selectedSlotData && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Time</span>
-                  <span className="font-semibold text-foreground">
-                    {selectedSlotData.startTime} – {selectedSlotData.endTime}
+              {selectedSlotsData.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-muted-foreground">
+                    Time{selectedSlotsData.length !== 1 ? "s" : ""}
                   </span>
+                  <ul className="list-disc list-inside text-foreground font-semibold space-y-0.5">
+                    {selectedSlotsData.map((s) => (
+                      <li key={s.id}>
+                        {s.startTime} – {s.endTime}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
               <div className="flex justify-between">
@@ -298,8 +309,8 @@ const Index = () => {
             <Button
               onClick={() => {
                 setSubmitted(false);
-                setSelectedSlot(null);
-                setSelectedSlotData(null);
+                setSelectedSlots([]);
+                setSelectedSlotsData([]);
                 setLocationId(null);
                 setLocationName("");
                 setLocation(null);
@@ -438,8 +449,8 @@ const Index = () => {
           location={location}
           companyBeUrl={companyBeUrl}
           slotDurationMinutes={slotDurationMinutes}
-          selectedSlot={selectedSlot}
-          onSelectSlot={handleSlotSelect}
+          selectedSlots={selectedSlots}
+          onToggleSlot={handleToggleSlot}
         />
 
         {/* Booking Details + Contact Details */}
