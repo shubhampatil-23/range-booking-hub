@@ -108,6 +108,8 @@ const Index = () => {
   const [invalidField, setInvalidField] = useState<string | null>(null);
   const confirmationCardRef = useRef<HTMLDivElement>(null);
   const paymentReturnCardRef = useRef<HTMLDivElement>(null);
+  const paymentReturnDownloadRef = useRef<HTMLDivElement>(null);
+  const hasAutoDownloadedRef = useRef(false);
   const [downloading, setDownloading] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -171,6 +173,15 @@ const Index = () => {
     }
   }, [paymentReturn]);
 
+  // Auto-download image when payment success/fail (content only, no buttons)
+  useEffect(() => {
+    if (!paymentReturn || paymentReturnLoading) return;
+    const t = setTimeout(() => {
+      runPaymentReturnAutoDownload();
+    }, 800);
+    return () => clearTimeout(t);
+  }, [paymentReturn, paymentReturnLoading]);
+
   const formatSlotTime = (iso: string) => {
     try {
       const d = new Date(iso);
@@ -183,7 +194,7 @@ const Index = () => {
   /** Get display values from booking (handles API snake_case or nested shapes) */
   const getBookingDisplay = (b: BookingModel | null) => {
     if (!b) return { locationName: "", amount: 0, bookingNumber: undefined as number | undefined };
-    const r = b as Record<string, unknown>;
+    const r = b as unknown as Record<string, unknown>;
     const locationName =
       String(b.locationName ?? r.location_name ?? "").trim() || "";
     const amount =
@@ -204,6 +215,7 @@ const Index = () => {
   };
 
   const clearPaymentReturn = () => {
+    hasAutoDownloadedRef.current = false;
     setPaymentReturn(null);
     setPaymentReturnBooking(null);
     setSearchParams({});
@@ -230,10 +242,11 @@ const Index = () => {
   };
 
   const handleDownloadPaymentReturnImage = async () => {
-    if (!paymentReturnCardRef.current) return;
+    const el = paymentReturnDownloadRef.current;
+    if (!el) return;
     setDownloading(true);
     try {
-      const dataUrl = await toPng(paymentReturnCardRef.current, {
+      const dataUrl = await toPng(el, {
         backgroundColor: "#ffffff",
         pixelRatio: 2,
       });
@@ -249,6 +262,27 @@ const Index = () => {
       toast({ title: "Download failed", description: "Could not save image.", variant: "destructive" });
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const runPaymentReturnAutoDownload = async () => {
+    const el = paymentReturnDownloadRef.current;
+    if (!el || hasAutoDownloadedRef.current) return;
+    hasAutoDownloadedRef.current = true;
+    try {
+      const dataUrl = await toPng(el, {
+        backgroundColor: "#ffffff",
+        pixelRatio: 2,
+      });
+      const link = document.createElement("a");
+      const label = paymentReturnBooking
+        ? getBookingDisplay(paymentReturnBooking).bookingNumber ?? paymentReturnBooking.id
+        : paymentReturn?.bookingId ?? "booking";
+      link.download = `booking-confirmation-${label}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch {
+      // Silent fail for auto-download
     }
   };
 
@@ -455,6 +489,8 @@ const Index = () => {
             )}
           >
             <div className="p-5 sm:p-6 space-y-4">
+              {/* Content only (included in auto-downloaded image; no buttons) */}
+          <div ref={paymentReturnDownloadRef} className="space-y-4">
               <div className="flex items-start gap-4">
                 {paymentReturn.payment === "Success" ? (
                   <div className="rounded-full bg-green-500/20 p-2 shrink-0">
@@ -487,7 +523,7 @@ const Index = () => {
                   <>
                     {(() => {
                       const display = getBookingDisplay(paymentReturnBooking);
-                      const contact = paymentReturnBooking.contact as Record<string, unknown> | undefined;
+                      const contact = paymentReturnBooking.contact as unknown as Record<string, unknown> | undefined;
                       const schedule = paymentReturnBooking.bookingSchedule ?? [];
                       const firstStart = schedule[0]?.startTime;
                       const bookingDate = firstStart
@@ -531,13 +567,13 @@ const Index = () => {
                             <span className="text-muted-foreground">Location</span>
                             <span className="text-foreground">{display.locationName || "–"}</span>
                           </div>
-                          {(paymentReturnBooking.reasonOfBooking ?? (paymentReturnBooking as Record<string, unknown>).reason_of_booking) && (
+                          {(paymentReturnBooking.reasonOfBooking ?? (paymentReturnBooking as unknown as Record<string, unknown>).reason_of_booking) && (
                             <div className="flex justify-between gap-2">
                               <span className="text-muted-foreground">Purpose</span>
                               <span className="text-foreground">
                                 {String(
                                   paymentReturnBooking.reasonOfBooking ??
-                                  (paymentReturnBooking as Record<string, unknown>).reason_of_booking ?? ""
+                                  (paymentReturnBooking as unknown as Record<string, unknown>).reason_of_booking ?? ""
                                 )}
                               </span>
                             </div>
@@ -581,6 +617,13 @@ const Index = () => {
                   </div>
                 ) : null}
               </div>
+              {paymentReturn.payment === "Failed" && (
+                  <p className="text-sm text-destructive font-medium rounded-lg bg-destructive/10 p-3 border border-destructive/30">
+                    <span className="font-semibold">Note :-</span> Your booking failed, but the slot is temporarily reserved and will expire soon. Please contact the admin if you want to confirm this booking.
+                  </p>
+                )}
+              </div>
+              {/* Buttons (not included in auto-downloaded image) */}
               <div className="flex flex-col gap-3">
                 <Button
                   onClick={handleDownloadPaymentReturnImage}
