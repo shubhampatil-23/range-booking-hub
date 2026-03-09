@@ -19,6 +19,13 @@ export interface Location {
   slotDurationMinutes?: number | null;
   slotDurationInMinutes?: number | null;
   locationHours?: LocationHours[];
+  /** Optional list of allowed purposes for this location (may be purpose, purposes, etc.) */
+  purpose?: string[];
+  purposes?: string[];
+  /** Hourly price / range fee from API (may be hourlyPrice, pricePerHour, rangeFee, etc.) */
+  hourlyPrice?: number | null;
+  pricePerHour?: number | null;
+  rangeFee?: number | null;
 }
 
 /** Find slotDuration (number) anywhere in object — handles nesting and snake_case */
@@ -47,6 +54,67 @@ function findSlotDurationInObject(obj: unknown): number | null {
 export function getSlotDuration(loc: Location): number {
   const found = findSlotDurationInObject(loc);
   return found ?? 60;
+}
+
+/** Find purpose/purposes array in location (handles nesting and snake_case) */
+function findPurposeArrayInObject(obj: unknown): string[] | null {
+  if (!obj || typeof obj !== "object") return null;
+  const record = obj as Record<string, unknown>;
+  const candidates = [
+    record.purpose,
+    record.purposes,
+    record.bookingPurposes,
+    record.booking_purposes,
+    record.locationPurpose,
+    record.location_purpose,
+  ];
+  for (const c of candidates) {
+    if (Array.isArray(c) && c.length > 0) {
+      const strings = c.filter((v): v is string => typeof v === "string");
+      if (strings.length > 0) return strings;
+    }
+  }
+  for (const v of Object.values(record)) {
+    const found = findPurposeArrayInObject(v);
+    if (found) return found;
+  }
+  return null;
+}
+
+/** Get location purposes array if present (for purpose dropdown); otherwise null */
+export function getLocationPurposes(loc: Location | null): string[] | null {
+  if (!loc) return null;
+  return findPurposeArrayInObject(loc);
+}
+
+/** Find hourly price (number) in location — handles various field names and nesting */
+function findHourlyPriceInObject(obj: unknown): number | null {
+  if (!obj || typeof obj !== "object") return null;
+  const record = obj as Record<string, unknown>;
+  const candidates = [
+    record.hourlyPrice,
+    record.pricePerHour,
+    record.rangeFee,
+    record.hourly_price,
+    record.price_per_hour,
+    record.range_fee,
+    record.price,
+  ];
+  for (const c of candidates) {
+    const n = typeof c === "string" ? parseFloat(c) : c;
+    if (typeof n === "number" && !Number.isNaN(n) && n >= 0) return n;
+  }
+  for (const v of Object.values(record)) {
+    const found = findHourlyPriceInObject(v);
+    if (found != null) return found;
+  }
+  return null;
+}
+
+/** Get hourly price for a location (for payment calculation); returns 0 if not set */
+export function getLocationHourlyPrice(loc: Location | null): number {
+  if (!loc) return 0;
+  return findHourlyPriceInObject(loc) ?? 0;
 }
 
 // ── Booking ──────────────────────────────────────────────
@@ -126,6 +194,9 @@ export interface AvailabilityResponse {
   totalAvailableMinutes?: number;
 }
 
+/** POST booking/create — matches backend BookingPaymentMode enum */
+export type BookingPaymentMode = "ccavenue";
+
 /** POST booking/create */
 export interface CreateBookingRequest {
   locationId: string;
@@ -136,6 +207,7 @@ export interface CreateBookingRequest {
   noOfPersons: number | string;
   totalBillableAmount: number;
   urlToken?: string;
+  paymentMode?: BookingPaymentMode;
 }
 
 export interface CreateBookingResponse {

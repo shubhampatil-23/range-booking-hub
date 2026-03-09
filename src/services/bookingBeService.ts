@@ -21,6 +21,11 @@ export const bookingBeService = {
     companyBeUrl: string,
     id: string
   ): Promise<BookingModel> {
-    return http.get<BookingModel>(companyBeUrl, `booking/${id}`);
+    const res = await http.get<
+      BookingModel | { data?: BookingModel; booking?: BookingModel }
+    >(companyBeUrl, `booking/getbyid/${id}`);
+    const raw = res as { data?: BookingModel; booking?: BookingModel };
+    const booking = raw?.data ?? raw?.booking ?? (res as BookingModel);
+    return booking as BookingModel;
   },
 };

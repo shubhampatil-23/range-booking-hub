@@ -15,6 +15,8 @@ export interface BookingSchedule {
   allDay?: boolean;
 }
 
+export type BookingPaymentMode = "ccavenue";
+
 export interface CreateBookingPayload {
   locationId: string;
   locationName?: string;
@@ -24,6 +26,7 @@ export interface CreateBookingPayload {
   noOfPersons?: string | number;
   totalBillableAmount?: number;
   urlToken?: string;
+  paymentMode?: BookingPaymentMode;
 }
 
 // ── Helpers ──────────────────────────────────────────────
@@ -64,6 +67,7 @@ export function buildPayload(input: {
   urlToken?: string;
   companyEnrollmentCode?: string;
   companyToken?: string;
+  paymentMode?: BookingPaymentMode;
 }): CreateBookingPayload {
   const {
     locationId,
@@ -78,6 +82,7 @@ export function buildPayload(input: {
     urlToken,
     companyEnrollmentCode,
     companyToken,
+    paymentMode,
   } = input;
 
   const token = urlToken ?? companyToken ?? companyEnrollmentCode;
@@ -109,5 +114,6 @@ export function buildPayload(input: {
       typeof noOfPersons === "number" ? String(noOfPersons) : noOfPersons,
     totalBillableAmount,
     ...(token && { urlToken: token }),
+    ...(paymentMode && { paymentMode }),
   };
 }

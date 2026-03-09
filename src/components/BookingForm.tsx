@@ -1,5 +1,12 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Users, Mail, Phone } from "lucide-react";
 
@@ -18,15 +25,18 @@ interface BookingFormProps {
   onChange: (data: BookingFormData) => void;
   invalidField?: string | null;
   onFieldChange?: (field: keyof BookingFormData) => void;
+  /** If provided, purpose is shown as a select with these options; otherwise text input */
+  locationPurposes?: string[] | null;
 }
 
-function BookingForm({ data, onChange, invalidField, onFieldChange }: BookingFormProps) {
+function BookingForm({ data, onChange, invalidField, onFieldChange, locationPurposes }: BookingFormProps) {
   const update = (field: keyof BookingFormData, value: string) => {
     onFieldChange?.(field);
     onChange({ ...data, [field]: value });
   };
 
   const err = invalidField ? "border-destructive ring-2 ring-destructive ring-offset-2" : "";
+  const showPurposeSelect = Array.isArray(locationPurposes) && locationPurposes.length > 0;
 
   return (
     <div className="space-y-6">
@@ -34,15 +44,37 @@ function BookingForm({ data, onChange, invalidField, onFieldChange }: BookingFor
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label htmlFor="purpose" className="text-primary text-sm">Purpose *</Label>
-            <Input
-              id="purpose"
-              value={data.purpose}
-              onChange={(e) => update("purpose", e.target.value)}
-              placeholder="Practice, Training..."
-              maxLength={20}
-              required
-              className={cn(invalidField === "purpose" ? err : "")}
-            />
+            {showPurposeSelect ? (
+              <Select
+                value={data.purpose || ""}
+                onValueChange={(value) => update("purpose", value)}
+                required
+              >
+                <SelectTrigger
+                  id="purpose"
+                  className={cn(invalidField === "purpose" ? err : "")}
+                >
+                  <SelectValue placeholder="Select purpose" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locationPurposes.map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {p}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                id="purpose"
+                value={data.purpose}
+                onChange={(e) => update("purpose", e.target.value)}
+                placeholder="Practice, Training..."
+                maxLength={20}
+                required
+                className={cn(invalidField === "purpose" ? err : "")}
+              />
+            )}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="attendees" className="text-muted-foreground text-sm">Attendees</Label>
